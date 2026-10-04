@@ -2,331 +2,456 @@
 <html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>همدم | سوشال مینی‌اپ</title>
-    
-    <!-- Telegram WebApp SDK -->
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+    <title>همدم</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    
-    <!-- Google Fonts: Vazirmatn -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    <!-- Phosphor Icons for ultra-crisp UI icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
-    <link rel="stylesheet" href="/static/css/style.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { body: ['Vazirmatn','sans-serif'] },
+                    colors: {
+                        surface: { 1:'#06080d', 2:'#0d1117', 3:'#151b26', 4:'#1c2333', 5:'#242d3d' },
+                        accent: { DEFAULT:'#f43f5e', light:'#fb7185', soft:'rgba(244,63,94,.15)', glow:'rgba(244,63,94,.45)' },
+                        mint: '#34d399',
+                        coral: '#f87171',
+                        sky: '#60a5fa'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        *, *::before, *::after { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        html, body { overflow: hidden; height: 100dvh; margin: 0; padding: 0; }
+        ::-webkit-scrollbar { width: 0; background: transparent; }
+
+        /* Animations */
+        @keyframes sheetUp { from{transform:translateY(100%);opacity:.5} to{transform:translateY(0);opacity:1} }
+        @keyframes popBounce { 0%{transform:scale(.6);opacity:0} 60%{transform:scale(1.05)} 100%{transform:scale(1);opacity:1} }
+        @keyframes pulse-ring { 0%{transform:scale(.4);opacity:.7} 100%{transform:scale(1.8);opacity:0} }
+        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+        @keyframes float-slow { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+
+        .anim-sheet { animation: sheetUp .38s cubic-bezier(.16,1,.3,1) }
+        .anim-pop   { animation: popBounce .45s cubic-bezier(.175,.885,.32,1.275) }
+        .pulse-ring  { animation: pulse-ring 2.4s infinite cubic-bezier(.215,.61,.355,1) }
+        .pulse-d1    { animation-delay: .7s }
+        .pulse-d2    { animation-delay: 1.4s }
+        .float-slow  { animation: float-slow 3.5s ease-in-out infinite }
+
+        /* Glass Surface */
+        .glass { background: rgba(13,17,23,.75); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+        .glass-heavy { background: rgba(13,17,23,.92); backdrop-filter: blur(32px); -webkit-backdrop-filter: blur(32px); }
+
+        /* Gradient Text */
+        .grad-text { background: linear-gradient(135deg,#fff 20%,#fb7185 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        /* Card Photo Overlay */
+        .card-overlay {
+            background: linear-gradient(to bottom,
+                rgba(6,8,13,0) 0%,
+                rgba(6,8,13,0) 35%,
+                rgba(6,8,13,.55) 60%,
+                rgba(6,8,13,.92) 80%,
+                rgba(6,8,13,.98) 100%
+            );
+        }
+
+        /* Stamp styles */
+        .stamp { pointer-events:none; z-index:20; }
+
+        /* Range input */
+        input[type=range] { accent-color: #f43f5e; height: 6px; }
+        select option { background: #151b26; color: #e2e8f0; }
+
+        /* Active nav indicator dot */
+        .nav-active-dot {
+            position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%);
+            width: 4px; height: 4px; border-radius: 50%; background: #f43f5e;
+            box-shadow: 0 0 8px rgba(244,63,94,.8);
+        }
+    </style>
 </head>
-<body>
-    <div id="app-container">
-        
-        <!-- Header -->
-        <header class="app-header">
-            <div class="brand">
-                <div class="brand-icon">
-                    <i class="ph-fill ph-flame"></i>
-                </div>
-                <span class="brand-name">همدم</span>
+
+<body class="bg-surface-1 text-white font-body select-none">
+<div id="app" class="flex flex-col w-full max-w-[480px] mx-auto h-[100dvh] relative overflow-hidden">
+
+    <!-- ╔══════════════════ HEADER ══════════════════╗ -->
+    <header class="relative flex items-center justify-between px-5 h-[56px] flex-shrink-0 z-30">
+        <!-- Ambient glow behind header -->
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-20 bg-accent/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="flex items-center gap-2.5 relative z-10">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-accent via-rose-400 to-pink-300 flex items-center justify-center text-[20px] shadow-lg shadow-accent/30 text-white">
+                <i class="ph-fill ph-heart"></i>
             </div>
-            <div class="header-actions">
-                <button id="btn-filters" class="icon-btn" title="فیلترها">
-                    <i class="ph-bold ph-faders"></i>
+            <div class="flex flex-col -space-y-0.5">
+                <span class="text-[17px] font-black tracking-tight grad-text">همدم</span>
+                <span class="text-[9px] font-medium text-white/30 tracking-wider">HAMDAM</span>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 relative z-10">
+            <button id="btn-filters" class="w-10 h-10 rounded-2xl glass border border-white/[.06] flex items-center justify-center text-[18px] text-white/60 active:scale-90 active:bg-white/10 transition-all duration-200">
+                <i class="ph-bold ph-sliders-horizontal"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ╔══════════════════ MAIN CONTENT ══════════════════╗ -->
+    <main class="flex-1 relative overflow-hidden">
+
+        <!-- ─── TAB: DISCOVER ─── -->
+        <section id="tab-discover" class="tab-pane absolute inset-0 flex flex-col">
+
+            <!-- Card Deck -->
+            <div class="flex-1 relative mx-4 mb-2 rounded-[28px] overflow-hidden">
+                <div id="card-deck" class="relative w-full h-full"></div>
+
+                <!-- Loading Skeleton -->
+                <div id="loading-state" class="hidden absolute inset-0 bg-surface-3 rounded-[28px] overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/[.03] to-transparent bg-[length:400%_100%]" style="animation:shimmer 2s infinite linear"></div>
+                </div>
+
+                <!-- Empty State -->
+                <div id="empty-state" class="hidden absolute inset-0 flex flex-col items-center justify-center text-center p-10 bg-surface-3 rounded-[28px] border border-white/[.04]">
+                    <div class="relative w-32 h-32 flex items-center justify-center mb-8 float-slow">
+                        <div class="absolute inset-0 rounded-full bg-accent/5"></div>
+                        <i class="ph-duotone ph-binoculars text-[52px] text-accent/80 z-10"></i>
+                        <div class="absolute inset-0 rounded-full border border-accent/30 opacity-0 pulse-ring"></div>
+                        <div class="absolute inset-0 rounded-full border border-accent/20 opacity-0 pulse-ring pulse-d1"></div>
+                        <div class="absolute inset-0 rounded-full border border-accent/10 opacity-0 pulse-ring pulse-d2"></div>
+                    </div>
+                    <h3 class="text-[19px] font-extrabold mb-2 text-white/90">کسی رو پیدا نکردیم!</h3>
+                    <p class="text-[13px] text-white/40 leading-[1.7] mb-7 max-w-[260px]">می‌تونید فیلترها رو تغییر بدید یا لیست رو از اول ببینید.</p>
+                    <button id="btn-reset-seen" class="group flex items-center gap-2 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-accent to-rose-400 text-white font-bold text-sm shadow-xl shadow-accent/25 active:scale-[.95] transition-transform">
+                        <i class="ph-bold ph-arrows-clockwise text-lg group-active:rotate-180 transition-transform duration-500"></i>
+                        <span>شروع مجدد</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Swipe Action Bar -->
+            <div id="swipe-controls" class="flex items-center justify-center gap-6 h-[84px] flex-shrink-0 pb-1">
+                <button id="btn-pass" class="group w-[60px] h-[60px] rounded-full bg-surface-3 border border-coral/15 flex items-center justify-center text-[26px] text-coral shadow-lg shadow-black/30 active:scale-[.82] transition-all duration-200 hover:border-coral/40 hover:shadow-coral/15 hover:shadow-xl">
+                    <i class="ph-bold ph-x group-active:rotate-90 transition-transform duration-300"></i>
+                </button>
+
+                <button id="btn-super" class="w-[48px] h-[48px] rounded-full bg-surface-3 border border-sky/15 flex items-center justify-center text-[20px] text-sky shadow-lg shadow-black/20 active:scale-[.82] transition-all duration-200 hover:border-sky/40">
+                    <i class="ph-fill ph-star"></i>
+                </button>
+
+                <button id="btn-like" class="group w-[66px] h-[66px] rounded-full bg-gradient-to-br from-accent via-rose-500 to-pink-400 flex items-center justify-center text-[30px] text-white shadow-xl shadow-accent/35 active:scale-[.82] transition-all duration-200 hover:shadow-accent/50 hover:shadow-2xl">
+                    <i class="ph-fill ph-heart group-hover:scale-110 transition-transform"></i>
                 </button>
             </div>
-        </header>
+        </section>
 
-        <!-- Main Content Area -->
-        <main id="main-content">
-            
-            <!-- 1. DISCOVER TAB -->
-            <section id="tab-discover" class="tab-pane active">
-                <div id="card-deck-container">
-                    <div id="card-deck" class="card-deck">
-                        <!-- Cards injected via JS -->
-                    </div>
-                    
-                    <!-- Empty State / Radar -->
-                    <div id="empty-state" class="empty-state hidden">
-                        <div class="radar-scanner">
-                            <div class="radar-circle"></div>
-                            <div class="radar-circle delay-1"></div>
-                            <div class="radar-circle delay-2"></div>
-                            <i class="ph-duotone ph-magnifying-glass radar-icon"></i>
-                        </div>
-                        <h3>کسی در اطراف شما نیست!</h3>
-                        <p>می‌توانید فیلترهای سنی یا شهری را تغییر دهید، یا افراد دیده‌شده را دوباره بررسی کنید.</p>
-                        <button id="btn-reset-seen" class="btn-gradient">
-                            <i class="ph-bold ph-arrows-clockwise"></i>
-                            <span>شروع مجدد و دیدن همه</span>
-                        </button>
-                    </div>
+        <!-- ─── TAB: MATCHES ─── -->
+        <section id="tab-matches" class="tab-pane absolute inset-0 flex flex-col hidden">
+            <div class="px-5 pt-4 pb-3 flex items-center justify-between">
+                <div>
+                    <h2 class="text-[18px] font-extrabold">مچ‌ها و گفتگوها</h2>
+                    <p class="text-[11px] text-white/35 mt-0.5">روی هر کارت بزنید تا گفتگو شروع بشه</p>
                 </div>
+                <span id="matches-badge" class="px-3.5 py-1.5 rounded-full glass border border-white/[.06] text-[11px] font-bold text-white/50">۰</span>
+            </div>
+            <div id="matches-list" class="flex-1 overflow-y-auto px-4 pb-8 grid grid-cols-2 gap-3 auto-rows-min content-start"></div>
+            <div id="matches-empty" class="hidden flex-1 flex flex-col items-center justify-center text-center gap-4 px-10">
+                <div class="w-20 h-20 rounded-full bg-surface-3 flex items-center justify-center float-slow">
+                    <i class="ph-duotone ph-heart-half text-4xl text-white/20"></i>
+                </div>
+                <p class="text-sm text-white/30 leading-relaxed">هنوز مچی ندارید.<br>پروفایل‌ها رو لایک کنید تا مچ بشید!</p>
+            </div>
+        </section>
 
-                <!-- Floating Swipe Action Buttons -->
-                <div id="swipe-controls" class="swipe-controls">
-                    <button id="btn-pass" class="action-btn btn-pass" title="رد کردن">
-                        <i class="ph-bold ph-x"></i>
-                    </button>
-                    <button id="btn-info" class="action-btn btn-info" title="مشاهده جزئیات">
-                        <i class="ph-bold ph-info"></i>
-                    </button>
-                    <button id="btn-like" class="action-btn btn-like" title="پسندیدن">
-                        <i class="ph-fill ph-heart"></i>
-                    </button>
-                </div>
-            </section>
+        <!-- ─── TAB: PROFILE ─── -->
+        <section id="tab-profile" class="tab-pane absolute inset-0 flex flex-col hidden overflow-y-auto">
+            <div class="p-4 space-y-4 pb-8">
 
-            <!-- 2. MATCHES TAB -->
-            <section id="tab-matches" class="tab-pane">
-                <div class="matches-header">
-                    <h2>گفتگوها و مچ‌ها</h2>
-                    <span id="matches-count-badge" class="badge">۰ مچ</span>
-                </div>
-                <div id="matches-list" class="matches-grid">
-                    <!-- Matches injected via JS -->
-                </div>
-                <div id="matches-empty" class="empty-state-simple hidden">
-                    <div class="empty-icon-box">
-                        <i class="ph-duotone ph-chats-circle"></i>
-                    </div>
-                    <p>هنوز با کسی مچ نشده‌اید.<br>به کشف افراد ادامه دهید!</p>
-                </div>
-            </section>
+                <!-- Hero Profile Card -->
+                <div class="relative bg-gradient-to-b from-surface-4 to-surface-2 rounded-[28px] overflow-hidden border border-white/[.04]">
+                    <!-- Decorative blobs -->
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-accent/8 rounded-full blur-3xl pointer-events-none"></div>
+                    <div class="absolute bottom-0 left-0 w-24 h-24 bg-sky/5 rounded-full blur-2xl pointer-events-none"></div>
 
-            <!-- 3. PROFILE TAB -->
-            <section id="tab-profile" class="tab-pane">
-                <div class="my-profile-container">
-                    <div class="profile-preview-card">
-                        <div class="profile-photo-box">
-                            <img id="my-profile-img" src="/static/img/default-avatar.png" alt="پروفایل">
-                            <label for="input-photo-upload" class="photo-upload-overlay">
+                    <div class="relative z-10 flex flex-col items-center pt-8 pb-6 px-5">
+                        <div class="relative mb-4">
+                            <div class="w-[100px] h-[100px] rounded-full p-[3px] bg-gradient-to-br from-accent via-rose-400 to-amber-300 shadow-2xl shadow-accent/20">
+                                <img id="my-photo" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%231c2333'/%3E%3Ctext x='50' y='58' text-anchor='middle' fill='%23ffffff25' font-size='32'%3E👤%3C/text%3E%3C/svg%3E" class="w-full h-full rounded-full object-cover bg-surface-4" alt="">
+                            </div>
+                            <label for="photo-upload" class="absolute -bottom-1 -right-1 w-9 h-9 rounded-full bg-accent flex items-center justify-center text-white text-[14px] shadow-lg shadow-accent/40 cursor-pointer border-[3px] border-surface-2 active:scale-90 transition-transform">
                                 <i class="ph-bold ph-camera"></i>
-                                <span>تغییر عکس</span>
                             </label>
-                            <input type="file" id="input-photo-upload" accept="image/*" class="hidden">
+                            <input type="file" id="photo-upload" accept="image/*" class="hidden">
                         </div>
-                        <h2 id="my-profile-name-age">کاربر تلگرام، ۲۵</h2>
-                        <span id="my-profile-city" class="city-pill">
-                            <i class="ph-fill ph-map-pin"></i> تهران
-                        </span>
+                        <h2 id="my-name" class="text-[20px] font-extrabold mb-1">کاربر</h2>
+                        <p id="my-city" class="flex items-center gap-1 text-[12px] text-white/35">
+                            <i class="ph-fill ph-map-pin text-accent/60"></i>
+                            <span>—</span>
+                        </p>
                     </div>
+                </div>
 
-                    <div class="profile-stats-card">
-                        <div class="stat-item">
-                            <span class="stat-value" id="stat-likes-remaining">۵۰</span>
-                            <span class="stat-label">لایک روزانه</span>
-                        </div>
-                        <div class="stat-divider"></div>
-                        <div class="stat-item">
-                            <span class="stat-value" id="stat-matches-total">۰</span>
-                            <span class="stat-label">مچ‌های فعال</span>
-                        </div>
+                <!-- Stats Row -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-surface-3 rounded-2xl p-4 border border-white/[.04] text-center">
+                        <span id="stat-likes" class="block text-[28px] font-black text-accent leading-none mb-1">۵۰</span>
+                        <span class="text-[10px] text-white/35 font-medium">لایک باقیمانده امروز</span>
                     </div>
+                    <div class="bg-surface-3 rounded-2xl p-4 border border-white/[.04] text-center">
+                        <span id="stat-matches" class="block text-[28px] font-black text-mint leading-none mb-1">۰</span>
+                        <span class="text-[10px] text-white/35 font-medium">مچ فعال</span>
+                    </div>
+                </div>
 
-                    <div class="profile-actions-list">
-                        <button id="btn-edit-profile-open" class="list-menu-item">
-                            <div class="menu-item-left">
-                                <i class="ph-duotone ph-user-gear"></i>
-                                <span>ویرایش اطلاعات و بیوگرافی</span>
+                <!-- Menu Items -->
+                <div class="space-y-2">
+                    <button id="btn-edit-profile" class="w-full bg-surface-3 rounded-2xl px-5 py-4 flex items-center justify-between border border-white/[.04] active:bg-surface-4 transition-colors group">
+                        <div class="flex items-center gap-3.5">
+                            <div class="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent text-lg">
+                                <i class="ph-duotone ph-pencil-simple-line"></i>
                             </div>
-                            <i class="ph-bold ph-caret-left"></i>
-                        </button>
-                        
-                        <button id="btn-open-rules" class="list-menu-item">
-                            <div class="menu-item-left">
-                                <i class="ph-duotone ph-shield-check"></i>
-                                <span>قوانین و امنیت</span>
+                            <div class="text-right">
+                                <span class="block text-[14px] font-semibold text-white/90">ویرایش پروفایل</span>
+                                <span class="block text-[11px] text-white/30 mt-0.5">نام، بیو، علایق و عکس</span>
                             </div>
-                            <i class="ph-bold ph-caret-left"></i>
-                        </button>
-                    </div>
-                </div>
-            </section>
-        </main>
-
-        <!-- Modern Bottom Navigation Bar -->
-        <nav class="bottom-nav">
-            <button class="nav-item active" data-tab="tab-discover">
-                <i class="ph-bold ph-flame"></i>
-                <span>کشف</span>
-            </button>
-            <button class="nav-item" data-tab="tab-matches">
-                <div class="nav-icon-wrapper">
-                    <i class="ph-bold ph-chat-teardrop-dots"></i>
-                    <span id="nav-match-dot" class="notification-dot hidden"></span>
-                </div>
-                <span>مچ‌ها</span>
-            </button>
-            <button class="nav-item" data-tab="tab-profile">
-                <i class="ph-bold ph-user"></i>
-                <span>پروفایل</span>
-            </button>
-        </nav>
-
-        <!-- MODAL: FILTERS -->
-        <div id="modal-filters" class="modal-overlay hidden">
-            <div class="modal-sheet">
-                <div class="modal-handle"></div>
-                <div class="modal-header">
-                    <h3>فیلترهای جستجو</h3>
-                    <button class="modal-close" data-close="modal-filters"><i class="ph-bold ph-x"></i></button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label>تمایل به آشنایی با:</label>
-                        <div class="segmented-control">
-                            <label class="segment">
-                                <input type="radio" name="filter-gender" value="" checked>
-                                <span>همه</span>
-                            </label>
-                            <label class="segment">
-                                <input type="radio" name="filter-gender" value="female">
-                                <span>خانم‌ها</span>
-                            </label>
-                            <label class="segment">
-                                <input type="radio" name="filter-gender" value="male">
-                                <span>آقایان</span>
-                            </label>
                         </div>
-                    </div>
+                        <i class="ph-bold ph-caret-left text-white/20 group-hover:text-white/40 transition-colors"></i>
+                    </button>
 
-                    <div class="form-group">
-                        <label for="filter-city">شهر:</label>
-                        <select id="filter-city" class="custom-select">
-                            <option value="">همه شهرها</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>محدوده سنی: <span id="age-range-display" class="highlight-text">۱۸ تا ۴۵ سال</span></label>
-                        <div class="range-slider-group">
-                            <input type="range" id="filter-min-age" min="16" max="60" value="18" class="range-input">
-                            <input type="range" id="filter-max-age" min="16" max="60" value="45" class="range-input">
+                    <button class="w-full bg-surface-3 rounded-2xl px-5 py-4 flex items-center justify-between border border-white/[.04] active:bg-surface-4 transition-colors group">
+                        <div class="flex items-center gap-3.5">
+                            <div class="w-10 h-10 rounded-xl bg-sky/10 flex items-center justify-center text-sky text-lg">
+                                <i class="ph-duotone ph-shield-checkered"></i>
+                            </div>
+                            <div class="text-right">
+                                <span class="block text-[14px] font-semibold text-white/90">قوانین و حریم خصوصی</span>
+                                <span class="block text-[11px] text-white/30 mt-0.5">اطلاعات شما محفوظ است</span>
+                            </div>
                         </div>
-                    </div>
+                        <i class="ph-bold ph-caret-left text-white/20 group-hover:text-white/40 transition-colors"></i>
+                    </button>
+                </div>
 
-                    <button id="btn-apply-filters" class="btn-gradient w-100 mt-20">اعمال فیلترها</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- ╔══════════════════ BOTTOM NAV ══════════════════╗ -->
+    <nav class="h-[64px] flex-shrink-0 glass-heavy border-t border-white/[.04] flex items-center justify-around px-4 z-50">
+        <button class="nav-btn active relative flex flex-col items-center gap-1 w-[72px] py-1.5 transition-all duration-200" data-tab="tab-discover">
+            <i class="ph-fill ph-flame text-[24px]"></i>
+            <span class="text-[10px] font-semibold">کشف</span>
+            <div class="nav-active-dot"></div>
+        </button>
+        <button class="nav-btn relative flex flex-col items-center gap-1 w-[72px] py-1.5 text-white/35 transition-all duration-200" data-tab="tab-matches">
+            <div class="relative">
+                <i class="ph-bold ph-chat-circle-dots text-[24px]"></i>
+                <div id="match-dot" class="hidden absolute -top-0.5 -right-0.5 w-[9px] h-[9px] rounded-full bg-accent border-2 border-surface-1 shadow-lg shadow-accent/60"></div>
+            </div>
+            <span class="text-[10px] font-semibold">مچ‌ها</span>
+        </button>
+        <button class="nav-btn relative flex flex-col items-center gap-1 w-[72px] py-1.5 text-white/35 transition-all duration-200" data-tab="tab-profile">
+            <i class="ph-bold ph-user-circle text-[24px]"></i>
+            <span class="text-[10px] font-semibold">پروفایل</span>
+        </button>
+    </nav>
+
+    <!-- ╔══════════════════ MODAL: FILTERS ══════════════════╗ -->
+    <div id="modal-filters" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end justify-center">
+        <div class="anim-sheet w-full max-w-[480px] bg-surface-2 rounded-t-[28px] border-t border-white/[.06] max-h-[82vh] overflow-y-auto">
+            <div class="sticky top-0 z-10 bg-surface-2 pt-4 pb-3 px-6">
+                <div class="w-10 h-1 bg-white/15 rounded-full mx-auto mb-4"></div>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-[17px] font-bold">فیلترهای جستجو</h3>
+                    <button data-close="modal-filters" class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 active:bg-white/10"><i class="ph-bold ph-x text-sm"></i></button>
                 </div>
             </div>
-        </div>
 
-        <!-- MODAL: EDIT / ONBOARDING PROFILE -->
-        <div id="modal-profile-form" class="modal-overlay hidden">
-            <div class="modal-sheet modal-fullscreen-sheet">
-                <div class="modal-handle"></div>
-                <div class="modal-header">
-                    <h3 id="profile-modal-title">ویرایش پروفایل</h3>
-                    <button class="modal-close" id="btn-close-profile-modal" data-close="modal-profile-form"><i class="ph-bold ph-x"></i></button>
+            <div class="px-6 pb-8 space-y-6">
+                <!-- Gender -->
+                <div>
+                    <label class="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-3 block">نمایش افراد</label>
+                    <div class="flex bg-surface-1 rounded-2xl p-1.5 gap-1">
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="fg" value="" checked class="hidden peer">
+                            <span class="block text-center py-3 rounded-xl text-[13px] font-semibold text-white/40 peer-checked:bg-gradient-to-r peer-checked:from-accent peer-checked:to-rose-400 peer-checked:text-white peer-checked:shadow-lg peer-checked:shadow-accent/25 transition-all duration-300">همه</span>
+                        </label>
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="fg" value="female" class="hidden peer">
+                            <span class="block text-center py-3 rounded-xl text-[13px] font-semibold text-white/40 peer-checked:bg-gradient-to-r peer-checked:from-accent peer-checked:to-rose-400 peer-checked:text-white peer-checked:shadow-lg peer-checked:shadow-accent/25 transition-all duration-300">خانم‌ها</span>
+                        </label>
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="fg" value="male" class="hidden peer">
+                            <span class="block text-center py-3 rounded-xl text-[13px] font-semibold text-white/40 peer-checked:bg-gradient-to-r peer-checked:from-accent peer-checked:to-rose-400 peer-checked:text-white peer-checked:shadow-lg peer-checked:shadow-accent/25 transition-all duration-300">آقایان</span>
+                        </label>
+                    </div>
                 </div>
-                <div class="modal-body scrollable">
-                    <form id="form-profile">
-                        <div class="form-group">
-                            <label for="input-name">نام یا نام مستعار *</label>
-                            <input type="text" id="input-name" class="custom-input" placeholder="نام خود را وارد کنید" required maxlength="30">
-                        </div>
 
-                        <div class="form-row">
-                            <div class="form-group half">
-                                <label for="input-age">سن *</label>
-                                <input type="number" id="input-age" class="custom-input" placeholder="مثال: ۲۴" min="16" max="60" required>
-                            </div>
-                            <div class="form-group half">
-                                <label for="input-gender">جنسیت *</label>
-                                <select id="input-gender" class="custom-select" required>
-                                    <option value="" disabled selected>انتخاب کنید</option>
-                                    <option value="male">آقا</option>
-                                    <option value="female">خانم</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="input-city">شهر محل سکونت *</label>
-                            <select id="input-city" class="custom-select" required>
-                                <option value="" disabled selected>انتخاب شهر</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="input-goal">هدف از حضور در ربات</label>
-                            <select id="input-goal" class="custom-select">
-                                <option value="">انتخاب هدف</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="input-education">میزان تحصیلات</label>
-                            <select id="input-education" class="custom-select">
-                                <option value="">انتخاب تحصیلات</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="input-job">شغل یا حوزه فعالیت</label>
-                            <input type="text" id="input-job" class="custom-input" placeholder="مثال: طراح گرافیک، برنامه‌نویس..." maxlength="40">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="input-bio">درباره من (بیوگرافی)</label>
-                            <textarea id="input-bio" class="custom-textarea" rows="3" placeholder="چند جمله درباره روحیات، اخلاق یا علایق خود بنویسید..." maxlength="300"></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label>علایق و سرگرمی‌ها (حداکثر ۵ مورد)</label>
-                            <div id="interests-chip-grid" class="chip-grid">
-                                <!-- Chips dynamically injected -->
-                            </div>
-                        </div>
-
-                        <button type="submit" id="btn-save-profile" class="btn-gradient w-100 mt-20">ذخیره پروفایل</button>
-                    </form>
+                <!-- City -->
+                <div>
+                    <label class="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-3 block">شهر</label>
+                    <select id="filter-city" class="w-full bg-surface-1 border border-white/[.06] rounded-2xl px-5 py-3.5 text-[13px] text-white outline-none focus:border-accent/50 transition-colors appearance-none">
+                        <option value="">همه شهرها</option>
+                    </select>
                 </div>
+
+                <!-- Age -->
+                <div>
+                    <label class="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-1 block">بازه سنی</label>
+                    <p class="text-[15px] font-bold text-accent mb-3" id="age-display">۱۸ — ۴۵ سال</p>
+                    <div class="flex gap-5 items-center">
+                        <div class="flex-1 flex flex-col gap-1">
+                            <span class="text-[10px] text-white/30">از</span>
+                            <input type="range" id="filter-min-age" min="16" max="60" value="18" class="w-full">
+                        </div>
+                        <div class="flex-1 flex flex-col gap-1">
+                            <span class="text-[10px] text-white/30">تا</span>
+                            <input type="range" id="filter-max-age" min="16" max="60" value="45" class="w-full">
+                        </div>
+                    </div>
+                </div>
+
+                <button id="btn-apply-filters" class="w-full py-4 rounded-2xl bg-gradient-to-r from-accent to-rose-400 text-white font-bold text-[14px] shadow-xl shadow-accent/20 active:scale-[.97] transition-transform">
+                    اعمال فیلترها
+                </button>
             </div>
         </div>
-
-        <!-- MODAL: MATCH POPUP -->
-        <div id="modal-match-success" class="modal-overlay hidden">
-            <div class="match-popup-card">
-                <div class="sparkles-container">
-                    <i class="ph-fill ph-sparkle sp-1"></i>
-                    <i class="ph-fill ph-heart sp-2"></i>
-                    <i class="ph-fill ph-sparkle sp-3"></i>
-                </div>
-                
-                <h1 class="match-title">🎉 تبریک! مچ شدید!</h1>
-                <p class="match-subtitle">شما و <span id="match-partner-name" class="highlight">کاربر</span> هر دو یکدیگر را پسندیدید.</p>
-                
-                <div class="match-avatars-pair">
-                    <div class="match-avatar-frame me">
-                        <img id="match-my-avatar" src="/static/img/default-avatar.png" alt="من">
-                    </div>
-                    <div class="match-heart-center">
-                        <i class="ph-fill ph-heart"></i>
-                    </div>
-                    <div class="match-avatar-frame partner">
-                        <img id="match-partner-avatar" src="/static/img/default-avatar.png" alt="هم‌صحبت">
-                    </div>
-                </div>
-
-                <div class="match-popup-buttons">
-                    <a id="btn-match-telegram-link" href="#" target="_blank" class="btn-gradient w-100">
-                        <i class="ph-bold ph-paper-plane-tilt"></i>
-                        <span>ارسال پیام در تلگرام</span>
-                    </a>
-                    <button id="btn-close-match-modal" class="btn-glass w-100">ادامه کشف افراد</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Toast Notifications -->
-        <div id="toast" class="toast hidden">
-            <span id="toast-message"></span>
-        </div>
-
     </div>
 
-    <!-- Scripts -->
-    <script src="/static/js/app.js"></script>
+    <!-- ╔══════════════════ MODAL: PROFILE FORM ══════════════════╗ -->
+    <div id="modal-profile" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end justify-center">
+        <div class="anim-sheet w-full max-w-[480px] bg-surface-2 rounded-t-[28px] border-t border-white/[.06] max-h-[93vh] overflow-y-auto">
+            <div class="sticky top-0 z-10 bg-surface-2 pt-4 pb-3 px-6">
+                <div class="w-10 h-1 bg-white/15 rounded-full mx-auto mb-4"></div>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-[17px] font-bold" id="profile-modal-title">ساخت پروفایل</h3>
+                    <button id="btn-close-profile" data-close="modal-profile" class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 active:bg-white/10"><i class="ph-bold ph-x text-sm"></i></button>
+                </div>
+            </div>
+
+            <form id="form-profile" class="px-6 pb-8 space-y-5">
+
+                <div>
+                    <label class="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2 block">نام نمایشی *</label>
+                    <input id="f-name" type="text" required maxlength="30" placeholder="مثلاً: سارا" class="w-full bg-surface-1 border border-white/[.06] rounded-2xl px-5 py-3.5 text-[14px] text-white placeholder:text-white/20 outline-none focus:border-accent/50 transition-colors">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2 block">سن *</label>
+                        <input id="f-age" type="number" required min="16" max="60" placeholder="۲۴" class="w-full bg-surface-1 border border-white/[.06] rounded-2xl px-5 py-3.5 text-[14px] text-white placeholder:text-white/20 outline-none focus:border-accent/50 transition-colors">
+                    </div>
+                    <div>
+                        <label class="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2 block">جنسیت *</label>
+                        <select id="f-gender" required class="w-full bg-surface-1 border border-white/[.06] rounded-2xl px-5 py-3.5 text-[14px] text-white outline-none focus:border-accent/50 transition-colors appearance-none">
+                            <option value="" disabled selected>انتخاب</option>
+                            <option value="male">آقا</option>
+                            <option value="female">خانم</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2 block">شهر *</label>
+                    <select id="f-city" required class="w-full bg-surface-1 border border-white/[.06] rounded-2xl px-5 py-3.5 text-[14px] text-white outline-none focus:border-accent/50 transition-colors appearance-none">
+                        <option value="" disabled selected>انتخاب شهر</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2 block">هدف</label>
+                        <select id="f-goal" class="w-full bg-surface-1 border border-white/[.06] rounded-2xl px-5 py-3.5 text-[13px] text-white outline-none focus:border-accent/50 transition-colors appearance-none">
+                            <option value="">انتخاب</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2 block">تحصیلات</label>
+                        <select id="f-edu" class="w-full bg-surface-1 border border-white/[.06] rounded-2xl px-5 py-3.5 text-[13px] text-white outline-none focus:border-accent/50 transition-colors appearance-none">
+                            <option value="">انتخاب</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2 block">شغل</label>
+                    <input id="f-job" type="text" maxlength="40" placeholder="مثلاً: طراح UI" class="w-full bg-surface-1 border border-white/[.06] rounded-2xl px-5 py-3.5 text-[14px] text-white placeholder:text-white/20 outline-none focus:border-accent/50 transition-colors">
+                </div>
+
+                <div>
+                    <label class="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-2 block">درباره من</label>
+                    <textarea id="f-bio" rows="3" maxlength="300" placeholder="چند جمله درباره خودتان بنویسید..." class="w-full bg-surface-1 border border-white/[.06] rounded-2xl px-5 py-3.5 text-[14px] text-white placeholder:text-white/20 outline-none focus:border-accent/50 transition-colors resize-none leading-relaxed"></textarea>
+                </div>
+
+                <div>
+                    <label class="text-[11px] text-white/40 font-bold uppercase tracking-wider mb-3 block">علایق <span class="text-white/20">(حداکثر ۵)</span></label>
+                    <div id="chips" class="flex flex-wrap gap-2"></div>
+                </div>
+
+                <button type="submit" class="w-full py-4 rounded-2xl bg-gradient-to-r from-accent to-rose-400 text-white font-bold text-[14px] shadow-xl shadow-accent/20 active:scale-[.97] transition-transform mt-3">
+                    ذخیره و ادامه
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ╔══════════════════ MODAL: MATCH CELEBRATION ══════════════════╗ -->
+    <div id="modal-match" class="hidden fixed inset-0 bg-black/80 backdrop-blur-xl z-[200] flex items-center justify-center p-5">
+        <div class="anim-pop w-full max-w-[380px] relative overflow-hidden rounded-[32px] border border-accent/15">
+            <!-- Background gradient art -->
+            <div class="absolute inset-0 bg-gradient-to-b from-accent/15 via-surface-2 to-surface-1"></div>
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-60 h-40 bg-accent/20 rounded-full blur-[60px] pointer-events-none"></div>
+
+            <div class="relative z-10 p-8 text-center">
+                <!-- Sparkles -->
+                <div class="flex justify-center gap-5 text-amber-300 text-xl mb-3">
+                    <i class="ph-fill ph-sparkle animate-pulse"></i>
+                    <i class="ph-fill ph-heart text-accent text-2xl"></i>
+                    <i class="ph-fill ph-sparkle animate-pulse"></i>
+                </div>
+
+                <h2 class="text-[26px] font-black grad-text mb-1.5">مچ شدید! 🎉</h2>
+                <p class="text-[13px] text-white/45 mb-7">شما و <span id="match-name" class="text-white font-bold">کاربر</span> همدیگر رو پسندیدید</p>
+
+                <!-- Avatar pair -->
+                <div class="flex items-center justify-center mb-8">
+                    <div class="w-[82px] h-[82px] rounded-full p-[2.5px] bg-gradient-to-br from-accent to-amber-300 translate-x-3 z-[1] shadow-2xl shadow-accent/30">
+                        <img id="match-my-img" src="" class="w-full h-full rounded-full object-cover bg-surface-4" alt="">
+                    </div>
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-accent to-rose-400 flex items-center justify-center text-white text-[16px] z-[3] shadow-xl shadow-accent/50 border-[3px] border-surface-1 -mx-2.5">
+                        <i class="ph-fill ph-heart"></i>
+                    </div>
+                    <div class="w-[82px] h-[82px] rounded-full p-[2.5px] bg-gradient-to-br from-accent to-amber-300 -translate-x-3 z-[1] shadow-2xl shadow-accent/30">
+                        <img id="match-partner-img" src="" class="w-full h-full rounded-full object-cover bg-surface-4" alt="">
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <a id="match-tg-link" href="#" target="_blank" class="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl bg-gradient-to-r from-accent to-rose-400 text-white font-bold text-[14px] shadow-xl shadow-accent/25 active:scale-[.97] transition-transform">
+                        <i class="ph-bold ph-paper-plane-tilt"></i>
+                        ارسال پیام در تلگرام
+                    </a>
+                    <button id="btn-close-match" class="w-full py-3.5 rounded-2xl bg-white/5 border border-white/[.08] text-white/60 font-semibold text-[13px] active:bg-white/10 transition-colors">
+                        ادامه کشف افراد
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ╔══════════════════ TOAST ══════════════════╗ -->
+    <div id="toast" class="hidden fixed top-14 left-1/2 -translate-x-1/2 z-[500] px-6 py-3 rounded-2xl glass-heavy border border-white/[.08] text-[13px] font-medium shadow-2xl shadow-black/40 transition-all duration-300">
+        <span id="toast-msg"></span>
+    </div>
+
+</div>
+
+<script src="/static/js/app.js?v=4.0"></script>
 </body>
 </html>
