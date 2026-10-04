@@ -1,346 +1,220 @@
 import sqlite3
-import json
-from datetime import datetime
-from pathlib import Path
-from typing import List, Dict, Optional, Any
-import config
+import os
+from datetime import date
+from contextlib import contextmanager
 
-DB_PATH = Path(__file__).resolve().parent / "social.db"
+DB_PATH = os.path.join(os.path.dirname(__file__), "hamdam.db")
 
 
-def get_db():
+@contextmanager
+def get_conn():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")  # کارایی بالا برای درخواست‌های همزمان وب
-    return conn
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def init_db():
-    with get_db() as conn:
-        cursor = conn.cursor()
-
-        cursor.execute("""
+    with get_conn() as conn:
+        conn.executescript("""
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
-                username TEXT,
-                name TEXT,
-                age INTEGER,
-                gender TEXT,
-                city TEXT,
-                photo_path TEXT,
-                photo_hash TEXT,
-                bio TEXT,
-                job TEXT,
-                education TEXT,
-                interests TEXT,
-                goal TEXT,
-                reg_state TEXT,
+                username TEXT DEFAULT '',
+                first_name TEXT DEFAULT '',
+                last_name TEXT DEFAULT '',
+                name TEXT DEFAULT '',
+                age INTEGER DEFAULT 0,
+                gender TEXT DEFAULT '',
+                city TEXT DEFAULT '',
+                bio TEXT DEFAULT '',
+                goal TEXT DEFAULT '',
+                education TEXT DEFAULT '',
+                job TEXT DEFAULT '',
+                interests TEXT DEFAULT '',
+                photo_url TEXT DEFAULT '',
                 is_complete INTEGER DEFAULT 0,
-                is_active INTEGER DEFAULT 1,
                 is_banned INTEGER DEFAULT 0,
-                created_at TEXT,
-                updated_at TEXT,
-                last_active TEXT
-            )
-        """)
+                daily_likes_used INTEGER DEFAULT 0,
+                last_like_date TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
 
-        cursor.execute("""
             CREATE TABLE IF NOT EXISTS likes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                from_user INTEGER,
-                to_user INTEGER,
-                created_at TEXT,
+                from_user INTEGER NOT NULL,
+                to_user INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(from_user, to_user)
-            )
-        """)
+            );
 
-        cursor.execute("""
             CREATE TABLE IF NOT EXISTS matches (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user1 INTEGER,
-                user2 INTEGER,
-                created_at TEXT,
+                user1 INTEGER NOT NULL,
+                user2 INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(user1, user2)
-            )
-        """)
+            );
 
-        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS seen (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                seen_user_id INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, seen_user_id)
+            );
+
             CREATE TABLE IF NOT EXISTS blocks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                blocker INTEGER,
-                blocked INTEGER,
-                created_at TEXT,
+                blocker INTEGER NOT NULL,
+                blocked INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(blocker, blocked)
-            )
-        """)
+            );
 
-        cursor.execute("""
             CREATE TABLE IF NOT EXISTS reports (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                reporter INTEGER,
-                reported INTEGER,
-                reason TEXT,
-                status TEXT DEFAULT 'pending',
-                created_at TEXT
-            )
+                reporter INTEGER NOT NULL,
+                reported INTEGER NOT NULL,
+                reason TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         """)
 
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS seen (
-                user_id INTEGER,
-                seen_user INTEGER,
-                created_at TEXT,
-                PRIMARY KEY (user_id, seen_user)
+
+def upsert_user(user_id: int, username: str = "", first_name: str = "", last_name: str = ""):
+    with get_conn() as conn:
+        existing = conn.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,)).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE users SET username=?, first_name=?, last_name=? WHERE user_id=?",
+                (username, first_name, last_name, user_id)
             )
-        """)
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS settings (
-                key TEXT PRIMARY KEY,
-                value TEXT
+        else:
+            conn.execute(
+                "INSERT INTO users (user_id, username, first_name, last_name) VALUES (?, ?, ?, ?)",
+                (user_id, username, first_name, last_name)
             )
-        """)
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS daily_likes (
-                user_id INTEGER,
-                like_date TEXT,
-                count INTEGER DEFAULT 0,
-                PRIMARY KEY(user_id, like_date)
-            )
-        """)
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS admin_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                admin_id INTEGER,
-                action TEXT,
-                target_id INTEGER,
-                details TEXT,
-                created_at TEXT
-            )
-        """)
-
-        conn.commit()
 
 
-# ===================== عملیات کاربران =====================
-
-def get_user(user_id: int) -> Optional[Dict[str, Any]]:
-    with get_db() as conn:
+def get_user(user_id: int) -> dict | None:
+    with get_conn() as conn:
         row = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
         return dict(row) if row else None
 
 
-def create_or_get_user(user_id: int, username: str = None, name: str = "") -> Dict[str, Any]:
-    now = datetime.utcnow().isoformat()
-    with get_db() as conn:
-        user = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
-        if not user:
-            conn.execute("""
-                INSERT INTO users (user_id, username, name, created_at, updated_at, last_active)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (user_id, username, name, now, now, now))
-            conn.commit()
-            return get_user(user_id)
-        else:
-            # بروزرسانی یوزرنیم
-            if username and user["username"] != username:
-                conn.execute("UPDATE users SET username = ?, updated_at = ? WHERE user_id = ?",
-                             (username, now, user_id))
-                conn.commit()
-            return dict(user)
+def update_profile(user_id: int, data: dict):
+    allowed = ["name", "age", "gender", "city", "bio", "goal", "education", "job", "interests", "photo_url", "is_complete"]
+    fields = []
+    values = []
+    for key in allowed:
+        if key in data:
+            fields.append(f"{key} = ?")
+            values.append(data[key])
+    if not fields:
+        return
+    values.append(user_id)
+    with get_conn() as conn:
+        conn.execute(f"UPDATE users SET {', '.join(fields)} WHERE user_id = ?", values)
 
 
-def update_user_profile(user_id: int, data: dict):
-    data["updated_at"] = datetime.utcnow().isoformat()
-    if "interests" in data and isinstance(data["interests"], list):
-        data["interests"] = json.dumps(data["interests"], ensure_ascii=False)
+def get_candidates(user_id: int, gender: str = "", city: str = "", min_age: int = 16, max_age: int = 60, limit: int = 20) -> list:
+    with get_conn() as conn:
+        query = """
+            SELECT * FROM users
+            WHERE user_id != ?
+              AND is_complete = 1
+              AND is_banned = 0
+              AND age BETWEEN ? AND ?
+              AND user_id NOT IN (SELECT seen_user_id FROM seen WHERE user_id = ?)
+              AND user_id NOT IN (SELECT blocked FROM blocks WHERE blocker = ?)
+              AND user_id NOT IN (SELECT blocker FROM blocks WHERE blocked = ?)
+        """
+        params = [user_id, min_age, max_age, user_id, user_id, user_id]
 
-    keys = [k for k in data.keys() if k not in ("user_id", "created_at")]
-    set_clause = ", ".join(f"{k} = ?" for k in keys)
-    values = [data[k] for k in keys] + [user_id]
+        if gender:
+            query += " AND gender = ?"
+            params.append(gender)
+        if city:
+            query += " AND city = ?"
+            params.append(city)
 
-    with get_db() as conn:
-        conn.execute(f"UPDATE users SET {set_clause} WHERE user_id = ?", values)
-        conn.commit()
+        query += " ORDER BY RANDOM() LIMIT ?"
+        params.append(limit)
 
-
-def update_last_active(user_id: int):
-    now = datetime.utcnow().isoformat()
-    with get_db() as conn:
-        conn.execute("UPDATE users SET last_active = ? WHERE user_id = ?", (now, user_id))
-        conn.commit()
-
-
-# ===================== کاندیداها و سوایپ =====================
-
-def find_candidates(user_id: int, filters: dict, limit: int = 15) -> List[Dict[str, Any]]:
-    query = """
-        SELECT u.* FROM users u
-        WHERE u.user_id != ?
-          AND u.is_complete = 1
-          AND u.is_active = 1
-          AND u.is_banned = 0
-          AND u.user_id NOT IN (SELECT seen_user FROM seen WHERE user_id = ?)
-          AND u.user_id NOT IN (SELECT blocked FROM blocks WHERE blocker = ?)
-          AND u.user_id NOT IN (SELECT blocker FROM blocks WHERE blocked = ?)
-          AND u.user_id NOT IN (SELECT to_user FROM likes WHERE from_user = ?)
-    """
-    params = [user_id, user_id, user_id, user_id, user_id]
-
-    if filters.get("city") and filters["city"] != "همه":
-        query += " AND u.city = ?"
-        params.append(filters["city"])
-
-    if filters.get("gender") and filters["gender"] in ("male", "female"):
-        query += " AND u.gender = ?"
-        params.append(filters["gender"])
-
-    if filters.get("min_age"):
-        query += " AND u.age >= ?"
-        params.append(int(filters["min_age"]))
-
-    if filters.get("max_age"):
-        query += " AND u.age <= ?"
-        params.append(int(filters["max_age"]))
-
-    query += " ORDER BY u.last_active DESC LIMIT ?"
-    params.append(limit)
-
-    with get_db() as conn:
         rows = conn.execute(query, params).fetchall()
-        result = []
-        for r in rows:
-            d = dict(r)
-            try:
-                d["interests"] = json.loads(d["interests"]) if d["interests"] else []
-            except Exception:
-                d["interests"] = []
-            result.append(d)
-        return result
+        return [dict(r) for r in rows]
 
 
-def mark_seen(user_id: int, seen_id: int):
-    now = datetime.utcnow().isoformat()
-    with get_db() as conn:
-        conn.execute(
-            "INSERT OR IGNORE INTO seen (user_id, seen_user, created_at) VALUES (?, ?, ?)",
-            (user_id, seen_id, now)
-        )
-        conn.commit()
+def add_seen(user_id: int, seen_user_id: int):
+    with get_conn() as conn:
+        conn.execute("INSERT OR IGNORE INTO seen (user_id, seen_user_id) VALUES (?, ?)", (user_id, seen_user_id))
 
 
 def reset_seen(user_id: int):
-    with get_db() as conn:
+    with get_conn() as conn:
         conn.execute("DELETE FROM seen WHERE user_id = ?", (user_id,))
-        conn.commit()
 
-
-# ===================== لایک و مچ =====================
 
 def add_like(from_user: int, to_user: int) -> bool:
-    now = datetime.utcnow().isoformat()
-    with get_db() as conn:
-        conn.execute(
-            "INSERT OR IGNORE INTO likes (from_user, to_user, created_at) VALUES (?, ?, ?)",
-            (from_user, to_user, now)
-        )
-
-        # بررسی مچ بودن
-        reciprocal = conn.execute(
-            "SELECT 1 FROM likes WHERE from_user = ? AND to_user = ?",
-            (to_user, from_user)
+    with get_conn() as conn:
+        conn.execute("INSERT OR IGNORE INTO likes (from_user, to_user) VALUES (?, ?)", (from_user, to_user))
+        mutual = conn.execute(
+            "SELECT id FROM likes WHERE from_user = ? AND to_user = ?", (to_user, from_user)
         ).fetchone()
-
-        if reciprocal:
-            u1, u2 = sorted([from_user, to_user])
-            conn.execute(
-                "INSERT OR IGNORE INTO matches (user1, user2, created_at) VALUES (?, ?, ?)",
-                (u1, u2, now)
-            )
-            conn.commit()
+        if mutual:
+            u1, u2 = min(from_user, to_user), max(from_user, to_user)
+            conn.execute("INSERT OR IGNORE INTO matches (user1, user2) VALUES (?, ?)", (u1, u2))
             return True
-
-        conn.commit()
         return False
 
 
-def get_matches(user_id: int) -> List[Dict[str, Any]]:
-    with get_db() as conn:
-        query = """
+def check_and_reset_daily_likes(user_id: int) -> int:
+    today = date.today().isoformat()
+    with get_conn() as conn:
+        row = conn.execute("SELECT daily_likes_used, last_like_date FROM users WHERE user_id = ?", (user_id,)).fetchone()
+        if row and row["last_like_date"] == today:
+            return row["daily_likes_used"]
+        conn.execute("UPDATE users SET daily_likes_used = 0, last_like_date = ? WHERE user_id = ?", (today, user_id))
+        return 0
+
+
+def increment_daily_likes(user_id: int):
+    today = date.today().isoformat()
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET daily_likes_used = daily_likes_used + 1, last_like_date = ? WHERE user_id = ?",
+            (today, user_id)
+        )
+
+
+def get_matches(user_id: int) -> list:
+    with get_conn() as conn:
+        rows = conn.execute("""
             SELECT u.* FROM users u
-            JOIN matches m ON (u.user_id = m.user1 OR u.user_id = m.user2)
-            WHERE (m.user1 = ? OR m.user2 = ?) AND u.user_id != ?
+            INNER JOIN matches m ON (
+                (m.user1 = ? AND m.user2 = u.user_id) OR
+                (m.user2 = ? AND m.user1 = u.user_id)
+            )
+            WHERE u.is_banned = 0
             ORDER BY m.created_at DESC
-        """
-        rows = conn.execute(query, (user_id, user_id, user_id)).fetchall()
-        matches = []
-        for r in rows:
-            d = dict(r)
-            try:
-                d["interests"] = json.loads(d["interests"]) if d["interests"] else []
-            except Exception:
-                d["interests"] = []
-            matches.append(d)
-        return matches
+        """, (user_id, user_id)).fetchall()
+        return [dict(r) for r in rows]
 
 
-def get_today_like_count(user_id: int) -> int:
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT count FROM daily_likes WHERE user_id = ? AND like_date = ?",
-            (user_id, today)
-        ).fetchone()
-        return row["count"] if row else 0
-
-
-def increment_daily_like(user_id: int):
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    with get_db() as conn:
-        conn.execute("""
-            INSERT INTO daily_likes (user_id, like_date, count)
-            VALUES (?, ?, 1)
-            ON CONFLICT(user_id, like_date) DO UPDATE SET count = count + 1
-        """, (user_id, today))
-        conn.commit()
-
-
-# ===================== بلاک و گزارش =====================
-
-def block_user(blocker: int, blocked: int):
-    now = datetime.utcnow().isoformat()
-    with get_db() as conn:
-        conn.execute(
-            "INSERT OR IGNORE INTO blocks (blocker, blocked, created_at) VALUES (?, ?, ?)",
-            (blocker, blocked, now)
-        )
-        # حذف مچ در صورت وجود
-        u1, u2 = sorted([blocker, blocked])
+def add_block(blocker: int, blocked: int):
+    with get_conn() as conn:
+        conn.execute("INSERT OR IGNORE INTO blocks (blocker, blocked) VALUES (?, ?)", (blocker, blocked))
+        u1, u2 = min(blocker, blocked), max(blocker, blocked)
         conn.execute("DELETE FROM matches WHERE user1 = ? AND user2 = ?", (u1, u2))
-        conn.commit()
+        conn.execute("DELETE FROM likes WHERE (from_user = ? AND to_user = ?) OR (from_user = ? AND to_user = ?)",
+                      (blocker, blocked, blocked, blocker))
 
 
-def add_report(reporter: int, reported: int, reason: str):
-    now = datetime.utcnow().isoformat()
-    with get_db() as conn:
-        conn.execute(
-            "INSERT INTO reports (reporter, reported, reason, created_at) VALUES (?, ?, ?, ?)",
-            (reporter, reported, reason, now)
-        )
-        conn.commit()
-
-
-# ===================== تنظیمات =====================
-
-def get_setting(key: str, default: str = "") -> str:
-    with get_db() as conn:
-        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
-        return row["value"] if row else default
-
-
-def set_setting(key: str, value: str):
-    with get_db() as conn:
-        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
-        conn.commit()
+def add_report(reporter: int, reported: int, reason: str = ""):
+    with get_conn() as conn:
+        conn.execute("INSERT INTO reports (reporter, reported, reason) VALUES (?, ?, ?)", (reporter, reported, reason))
