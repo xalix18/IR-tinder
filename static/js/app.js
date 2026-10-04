@@ -1,375 +1,512 @@
-// دریافت توکن احراز هویت تلگرام
+/* ==========================================================================
+   HAMDAM TELEGRAM MINI APP CLIENT ENGINE
+   ========================================================================== */
+
 const tg = window.Telegram?.WebApp;
-let initData = "";
-let currentUser = null;
-let currentOptions = {};
-let candidatesQueue = [];
-let currentFilters = { city: "همه", gender: "any", min_age: 16, max_age: 60 };
+if (tg) {
+    tg.ready();
+    tg.expand();
+    try {
+        tg.setHeaderColor('#0B0E14');
+        tg.setBackgroundColor('#0B0E14');
+    } catch (e) {}
+}
 
-document.addEventListener("DOMContentLoaded", async () => {
-    if (tg) {
-        tg.expand();
-        tg.enableClosingConfirmation();
-        initData = tg.initData || "";
-    }
+const state = {
+    user: null,
+    constants: {},
+    candidates: [],
+    currentIndex: 0,
+    filters: { gender: '', city: '', min_age: 18, max_age: 45 },
+    selectedInterests: []
+};
 
-    setupTabs();
-    setupFilters();
-    await initApp();
+// --- Initialization ---
+document.addEventListener('DOMContentLoaded', async () => {
+    setupNavigation();
+    setupModals();
+    setupSwipeButtons();
+    setupProfileForm();
+    await loadInitialData();
 });
 
-// ارتباط با بک‌اند
-async function fetchAPI(endpoint, method = "GET", body = null) {
-    const headers = {
-        "Content-Type": "application/json",
-        "X-Telegram-Init-Data": initData
-    };
-
+// --- API Request Helper ---
+async function apiCall(endpoint, method = 'GET', body = null, isFormData = false) {
+    const headers = { 'X-Telegram-Init-Data': tg?.initData || '' };
     const options = { method, headers };
-    if (body) options.body = JSON.stringify(body);
 
-    const res = await fetch(`/api/${endpoint}`, options);
-    if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "خطایی رخ داد");
-    }
-    return res.json();
-}
-
-// مقداردهی اولیه برنامه
-async function initApp() {
-    try {
-        const data = await fetchAPI("init");
-        currentUser = data.user;
-        currentOptions = data.options;
-
-        document.getElementById("loading-screen").classList.add("hidden");
-
-        // اگر پروفایل کامل نبود، فرم را نشان بده
-        if (!currentUser.is_complete) {
-            openProfileModal(true);
+    if (body) {
+        if (isFormData) {
+            options.body = body;
         } else {
-            renderMyProfile();
-            await loadCandidates();
+            headers['Content-Type'] = 'application/json';
+            options.body = JSON.stringify(body);
         }
-    } catch (e) {
-        alert("خطا در بارگذاری اولیه: " + e.message);
+    }
+
+    try {
+        const res = await fetch(endpoint, options);
+        return await res.json();
+    } catch (err) {
+        showToast('خطا در ارتباط با سرور');
+        return { success: false, error: err.message };
     }
 }
 
-// بارگذاری گزینه‌های کاندیدا
-async function loadCandidates() {
-    const data = await fetchAPI("candidates", "POST", currentFilters);
-    candidatesQueue = data.candidates || [];
-    renderCards();
-}
-
-// رندر کارت‌های سوایپ
-function renderCards() {
-    const container = document.getElementById("card-container");
-    const emptyState = document.getElementById("empty-state");
-    container.innerHTML = "";
-
-    if (candidatesQueue.length === 0) {
-        emptyState.classList.remove("hidden");
+// --- Load Initial Data ---
+async function loadInitialData() {
+    const res = await apiCall('/api/init');
+    if (!res.success) {
+        showToast(res.error || 'خطا در بارگذاری اولیه');
         return;
     }
-    emptyState.classList.add("hidden");
 
-    candidatesQueue.forEach((user, index) => {
-        const card = document.createElement("div");
-        card.className = "tinder-card";
-        card.style.zIndex = candidatesQueue.length - index;
+    state.constants = res.constants;
+    state.user = res.user;
 
-        const photoUrl = user.photo_path || "/static/images/default-avatar.png";
-        card.style.backgroundImage = `url('${photoUrl}')`;
+    populateFormDropdowns();
 
-        card.innerHTML = `
-            <div class="badge-swipe badge-like">LIKE</div>
-            <div class="badge-swipe badge-pass">NOPE</div>
-            <div class="card-gradient">
-                <div class="card-title">${user.name}، ${user.age}</div>
-                <div class="card-subtitle"><i class="fa-solid fa-location-dot"></i> ${user.city} ${user.job ? '• ' + user.job : ''}</div>
-                ${user.bio ? `<div class="card-bio">${user.bio}</div>` : ''}
-            </div>
-        `;
+    if (!state.user.is_complete) {
+        openModal('modal-profile-form');
+        document.getElementById('btn-close-profile-modal').classList.add('hidden');
+    } else {
+        updateMyProfileUI();
+        await loadCandidates();
+    }
+}
 
-        if (index === 0) {
-            initCardSwipe(card, user);
-        }
-        container.appendChild(card);
+// --- Populate Dropdowns ---
+function populateFormDropdowns() {
+    const citySelect = document.getElementById('input-city');
+    const filterCitySelect = document.getElementById('filter-city');
+    const goalSelect = document.getElementById('input-goal');
+    const eduSelect = document.getElementById('input-education');
+    const chipGrid = document.getElementById('interests-chip-grid');
+
+    // Cities
+    state.constants.CITIES?.forEach(city => {
+        citySelect.innerHTML += `<option value="${city}">${city}</option>`;
+        filterCitySelect.innerHTML += `<option value="${city}">${city}</option>`;
+    });
+
+    // Goals
+    state.constants.GOALS?.forEach(goal => {
+        goalSelect.innerHTML += `<option value="${goal}">${goal}</option>`;
+    });
+
+    // Education
+    state.constants.EDUCATION?.forEach(edu => {
+        eduSelect.innerHTML += `<option value="${edu}">${edu}</option>`;
+    });
+
+    // Interests
+    chipGrid.innerHTML = '';
+    state.constants.INTERESTS?.forEach(interest => {
+        const chip = document.createElement('div');
+        chip.className = 'chip-item';
+        chip.textContent = interest;
+        chip.onclick = () => toggleInterestChip(chip, interest);
+        chipGrid.appendChild(chip);
     });
 }
 
-// قابلیت کشیدن کارت با لمس و ماوس
-function initCardSwipe(card, user) {
+function toggleInterestChip(el, interest) {
+    if (state.selectedInterests.includes(interest)) {
+        state.selectedInterests = state.selectedInterests.filter(i => i !== interest);
+        el.classList.remove('selected');
+    } else {
+        if (state.selectedInterests.length >= 5) {
+            showToast('حداکثر ۵ مورد می‌توانید انتخاب کنید');
+            return;
+        }
+        state.selectedInterests.push(interest);
+        el.classList.add('selected');
+    }
+}
+
+// --- Update Profile View ---
+function updateMyProfileUI() {
+    if (!state.user) return;
+    document.getElementById('my-profile-name-age').textContent = `${state.user.name || 'کاربر'}, ${state.user.age || ''}`;
+    document.getElementById('my-profile-city').innerHTML = `<i class="ph-fill ph-map-pin"></i> ${state.user.city || 'ثبت نشده'}`;
+    document.getElementById('stat-likes-remaining').textContent = 50 - (state.user.daily_likes_used || 0);
+
+    if (state.user.photo_url) {
+        document.getElementById('my-profile-img').src = state.user.photo_url;
+        document.getElementById('match-my-avatar').src = state.user.photo_url;
+    }
+}
+
+// --- Navigation Handling ---
+function setupNavigation() {
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            navItems.forEach(n => n.classList.remove('active'));
+            item.classList.add('active');
+
+            const tabId = item.dataset.tab;
+            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+
+            if (tabId === 'tab-matches') loadMatches();
+            haptic('selection');
+        });
+    });
+}
+
+// --- Candidates Deck & Swiping ---
+async function loadCandidates() {
+    const deck = document.getElementById('card-deck');
+    const emptyState = document.getElementById('empty-state');
+    deck.innerHTML = '';
+    state.candidates = [];
+    state.currentIndex = 0;
+
+    const res = await apiCall('/api/candidates', 'POST', state.filters);
+    if (res.success && res.candidates?.length > 0) {
+        state.candidates = res.candidates;
+        emptyState.classList.add('hidden');
+        renderCards();
+    } else {
+        emptyState.classList.remove('hidden');
+    }
+}
+
+function renderCards() {
+    const deck = document.getElementById('card-deck');
+    deck.innerHTML = '';
+
+    state.candidates.forEach((cand, idx) => {
+        if (idx < state.currentIndex) return;
+
+        const card = document.createElement('div');
+        card.className = 'tinder-card';
+        card.style.zIndex = state.candidates.length - idx;
+
+        const photo = cand.photo_url || '/static/img/default-avatar.png';
+        const goalBadge = cand.goal ? `<span class="meta-pill highlight"><i class="ph-fill ph-target"></i> ${cand.goal}</span>` : '';
+        const jobBadge = cand.job ? `<span class="meta-pill"><i class="ph-fill ph-briefcase"></i> ${cand.job}</span>` : '';
+
+        card.innerHTML = `
+            <div class="card-image-wrapper">
+                <img src="${photo}" alt="${cand.name}">
+                <div class="card-gradient-overlay"></div>
+            </div>
+            
+            <div class="swipe-stamp stamp-like">LIKE</div>
+            <div class="swipe-stamp stamp-pass">NOPE</div>
+
+            <div class="card-info-content">
+                <div class="card-title-row">
+                    <h2>${cand.name}</h2>
+                    <span class="card-age">${cand.age}</span>
+                </div>
+                <div class="card-meta-chips">
+                    <span class="meta-pill"><i class="ph-fill ph-map-pin"></i> ${cand.city}</span>
+                    ${goalBadge}
+                    ${jobBadge}
+                </div>
+                ${cand.bio ? `<p class="card-bio-text">${cand.bio}</p>` : ''}
+            </div>
+        `;
+
+        if (idx === state.currentIndex) {
+            initCardDrag(card, cand);
+        }
+
+        deck.appendChild(card);
+    });
+}
+
+// --- Touch & Mouse Swiping Engine ---
+function initCardDrag(card, candidate) {
     let startX = 0, currentX = 0, isDragging = false;
-    const likeBadge = card.querySelector(".badge-like");
-    const passBadge = card.querySelector(".badge-pass");
+    const likeStamp = card.querySelector('.stamp-like');
+    const passStamp = card.querySelector('.stamp-pass');
 
     const onStart = (e) => {
         isDragging = true;
-        startX = e.clientX || e.touches[0].clientX;
-        card.classList.add("dragging");
+        startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        card.classList.add('moving');
     };
 
     const onMove = (e) => {
         if (!isDragging) return;
-        currentX = (e.clientX || e.touches[0].clientX) - startX;
+        currentX = (e.type.includes('touch') ? e.touches[0].clientX : e.clientX) - startX;
         const rotate = currentX * 0.08;
-        card.style.transform = `translateX(${currentX}px) rotate(${rotate}deg)`;
 
-        // نمایش برچسب‌ها
-        if (currentX > 30) {
-            likeBadge.style.opacity = Math.min(currentX / 100, 1);
-            passBadge.style.opacity = 0;
-        } else if (currentX < -30) {
-            passBadge.style.opacity = Math.min(-currentX / 100, 1);
-            likeBadge.style.opacity = 0;
+        card.style.transform = `translate3d(${currentX}px, 0, 0) rotate(${rotate}deg)`;
+
+        if (currentX > 20) {
+            likeStamp.style.opacity = Math.min(currentX / 100, 1);
+            passStamp.style.opacity = 0;
+        } else if (currentX < -20) {
+            passStamp.style.opacity = Math.min(Math.abs(currentX) / 100, 1);
+            likeStamp.style.opacity = 0;
         } else {
-            likeBadge.style.opacity = 0;
-            passBadge.style.opacity = 0;
+            likeStamp.style.opacity = 0;
+            passStamp.style.opacity = 0;
         }
     };
 
     const onEnd = () => {
         if (!isDragging) return;
         isDragging = false;
-        card.classList.remove("dragging");
+        card.classList.remove('moving');
 
-        if (currentX > 120) {
-            swipeAction(user.user_id, "like", card);
-        } else if (currentX < -120) {
-            swipeAction(user.user_id, "pass", card);
+        if (currentX > 110) {
+            triggerSwipe('like', card, candidate);
+        } else if (currentX < -110) {
+            triggerSwipe('pass', card, candidate);
         } else {
-            card.style.transform = "";
-            likeBadge.style.opacity = 0;
-            passBadge.style.opacity = 0;
+            card.style.transform = '';
+            likeStamp.style.opacity = 0;
+            passStamp.style.opacity = 0;
         }
     };
 
-    card.addEventListener("mousedown", onStart);
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onEnd);
+    card.addEventListener('touchstart', onStart, { passive: true });
+    card.addEventListener('touchmove', onMove, { passive: true });
+    card.addEventListener('touchend', onEnd);
 
-    card.addEventListener("touchstart", onStart);
-    window.addEventListener("touchmove", onMove);
-    window.addEventListener("touchend", onEnd);
+    card.addEventListener('mousedown', onStart);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onEnd);
 }
 
-// ارسال لایک یا رد
-async function swipeAction(targetId, action, cardElement) {
-    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
+// --- Trigger Swipe Action ---
+async function triggerSwipe(action, cardEl, candidate) {
+    const isLike = action === 'like';
+    haptic(isLike ? 'impactMedium' : 'impactLight');
 
-    const direction = action === "like" ? 500 : -500;
-    if (cardElement) {
-        cardElement.style.transform = `translateX(${direction}px) rotate(${direction * 0.1}deg)`;
-        cardElement.style.opacity = "0";
-    }
+    const flyX = isLike ? window.innerWidth * 1.3 : -window.innerWidth * 1.3;
+    cardEl.style.transition = 'transform 0.4s ease, opacity 0.3s ease';
+    cardEl.style.transform = `translate3d(${flyX}px, 0, 0) rotate(${isLike ? 35 : -35}deg)`;
+    cardEl.style.opacity = '0';
 
-    try {
-        const res = await fetchAPI("swipe", "POST", { target_id: targetId, action });
-        candidatesQueue.shift();
-        setTimeout(() => renderCards(), 200);
+    setTimeout(() => cardEl.remove(), 400);
 
-        if (res.match && res.matched_user) {
-            showMatchModal(res.matched_user);
-        }
-    } catch (e) {
-        alert(e.message);
-        renderCards();
-    }
-}
-
-// پاپ‌آپ مچ شدن
-function showMatchModal(targetUser) {
-    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
-    const modal = document.getElementById("match-popup");
-    document.getElementById("match-my-img").src = currentUser.photo_path || "/static/images/default-avatar.png";
-    document.getElementById("match-target-img").src = targetUser.photo_path || "/static/images/default-avatar.png";
-
-    const chatBtn = document.getElementById("match-chat-btn");
-    if (targetUser.username) {
-        chatBtn.href = `https://t.me/${targetUser.username}`;
-        chatBtn.classList.remove("hidden");
+    state.currentIndex++;
+    if (state.currentIndex >= state.candidates.length) {
+        document.getElementById('empty-state').classList.remove('hidden');
     } else {
-        chatBtn.classList.add("hidden");
+        const nextCard = document.querySelectorAll('.tinder-card')[1];
+        if (nextCard) initCardDrag(nextCard, state.candidates[state.currentIndex]);
     }
 
-    modal.classList.remove("hidden");
-    document.getElementById("match-close-btn").onclick = () => modal.classList.add("hidden");
-}
-
-// ناوبری تب‌ها
-function setupTabs() {
-    document.querySelectorAll(".nav-item").forEach(btn => {
-        btn.addEventListener("click", () => {
-            document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
-            document.querySelectorAll(".tab-view").forEach(t => t.classList.add("hidden"));
-
-            btn.classList.add("active");
-            const tabId = btn.getAttribute("data-tab");
-            document.getElementById(tabId).classList.remove("hidden");
-
-            if (tabId === "tab-matches") loadMatches();
-        });
+    const res = await apiCall('/api/swipe', 'POST', {
+        target_id: candidate.user_id,
+        action: action
     });
 
-    // دکمه‌های سوایپ دستی
-    document.getElementById("btn-like").onclick = () => {
-        if (candidatesQueue.length) swipeAction(candidatesQueue[0].user_id, "like", document.querySelector(".tinder-card"));
-    };
-    document.getElementById("btn-pass").onclick = () => {
-        if (candidatesQueue.length) swipeAction(candidatesQueue[0].user_id, "pass", document.querySelector(".tinder-card"));
-    };
-    document.getElementById("btn-restart").onclick = async () => {
-        await fetchAPI("reset-seen", "POST");
-        await loadCandidates();
-    };
-}
-
-// بارگذاری مچ‌ها
-async function loadMatches() {
-    const list = document.getElementById("matches-list");
-    list.innerHTML = "<p>در حال دریافت...</p>";
-    try {
-        const data = await fetchAPI("matches");
-        if (!data.matches.length) {
-            list.innerHTML = "<p class='text-center'>هنوز مچی ندارید. افراد بیشتری را لایک کنید!</p>";
-            return;
-        }
-        list.innerHTML = data.matches.map(m => `
-            <div class="match-item">
-                <img src="${m.photo_path || '/static/images/default-avatar.png'}">
-                <h4>${m.name}، ${m.age}</h4>
-                <p class="card-subtitle">${m.city}</p>
-                ${m.username ? `<a href="https://t.me/${m.username}" target="_blank" class="btn btn-primary"><i class="fa-brands fa-telegram"></i> گفت‌وگو</a>` : ''}
-            </div>
-        `).join("");
-    } catch (e) {
-        list.innerHTML = "<p>خطا در بارگذاری مچ‌ها</p>";
+    if (res.success && res.is_match) {
+        showMatchCelebration(candidate);
     }
 }
 
-// پروفایل
-function renderMyProfile() {
-    document.getElementById("my-name-age").textContent = `${currentUser.name}، ${currentUser.age}`;
-    document.getElementById("my-location").innerHTML = `<i class="fa-solid fa-location-dot"></i> ${currentUser.city}`;
-    document.getElementById("my-bio").textContent = currentUser.bio || "بیوگرافی هنوز وارد نشده است.";
-    if (currentUser.photo_path) document.getElementById("my-avatar").src = currentUser.photo_path;
+// --- Match Celebration Modal ---
+function showMatchCelebration(partner) {
+    haptic('notificationSuccess');
+    document.getElementById('match-partner-name').textContent = partner.name;
+    document.getElementById('match-partner-avatar').src = partner.photo_url || '/static/img/default-avatar.png';
+    
+    const tgBtn = document.getElementById('btn-match-telegram-link');
+    if (partner.username) {
+        tgBtn.href = `https://t.me/${partner.username}`;
+        tgBtn.classList.remove('hidden');
+    } else {
+        tgBtn.classList.add('hidden');
+    }
 
-    // آپلود عکس
-    document.getElementById("photo-upload").onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const fd = new FormData();
-        fd.append("photo", file);
+    openModal('modal-match-success');
+}
 
-        const res = await fetch("/api/photo", {
-            method: "POST",
-            headers: { "X-Telegram-Init-Data": initData },
-            body: fd
-        });
-        if (res.ok) {
-            const data = await res.json();
-            currentUser.photo_path = data.photo_url;
-            document.getElementById("my-avatar").src = data.photo_url;
-        } else {
-            alert("خطا در آپلود عکس");
+// --- Swipe Bottom Buttons ---
+function setupSwipeButtons() {
+    document.getElementById('btn-like').onclick = () => {
+        const currentCard = document.querySelectorAll('.tinder-card')[0];
+        if (currentCard && state.candidates[state.currentIndex]) {
+            triggerSwipe('like', currentCard, state.candidates[state.currentIndex]);
         }
     };
 
-    document.getElementById("btn-edit-profile").onclick = () => openProfileModal(false);
+    document.getElementById('btn-pass').onclick = () => {
+        const currentCard = document.querySelectorAll('.tinder-card')[0];
+        if (currentCard && state.candidates[state.currentIndex]) {
+            triggerSwipe('pass', currentCard, state.candidates[state.currentIndex]);
+        }
+    };
+
+    document.getElementById('btn-reset-seen').onclick = async () => {
+        const res = await apiCall('/api/reset-seen', 'POST');
+        if (res.success) {
+            showToast('لیست افراد بازنشانی شد.');
+            await loadCandidates();
+        }
+    };
 }
 
-// فرم تکمیل/ویرایش پروفایل
-function openProfileModal(isNew = false) {
-    const modal = document.getElementById("register-modal");
-    const citySelect = document.getElementById("reg-city");
-    const eduSelect = document.getElementById("reg-education");
-    const goalSelect = document.getElementById("reg-goal");
-    const chipsBox = document.getElementById("interests-chips");
-
-    citySelect.innerHTML = currentOptions.cities.map(c => `<option value="${c}">${c}</option>`).join("");
-    eduSelect.innerHTML = currentOptions.education_levels.map(e => `<option value="${e}">${e}</option>`).join("");
-    goalSelect.innerHTML = currentOptions.goals.map(g => `<option value="${g}">${g}</option>`).join("");
-
-    let selectedInterests = currentUser.interests || [];
-    chipsBox.innerHTML = currentOptions.interests.map(i => {
-        const isSel = selectedInterests.includes(i) ? "selected" : "";
-        return `<div class="chip ${isSel}" data-val="${i}">${i}</div>`;
-    }).join("");
-
-    chipsBox.querySelectorAll(".chip").forEach(chip => {
-        chip.onclick = () => {
-            const val = chip.getAttribute("data-val");
-            if (selectedInterests.includes(val)) {
-                selectedInterests = selectedInterests.filter(x => x !== val);
-                chip.classList.remove("selected");
-            } else {
-                if (selectedInterests.length >= 5) return alert("حداکثر ۵ مورد!");
-                selectedInterests.push(val);
-                chip.classList.add("selected");
-            }
-        };
+// --- Modals Management ---
+function setupModals() {
+    document.querySelectorAll('[data-close]').forEach(btn => {
+        btn.onclick = () => closeModal(btn.dataset.close);
     });
 
-    if (!isNew) {
-        document.getElementById("reg-name").value = currentUser.name || "";
-        document.getElementById("reg-age").value = currentUser.age || "";
-        document.getElementById("reg-gender").value = currentUser.gender || "male";
-        document.getElementById("reg-city").value = currentUser.city || currentOptions.cities[0];
-        document.getElementById("reg-job").value = currentUser.job || "";
-        document.getElementById("reg-bio").value = currentUser.bio || "";
-    }
+    document.getElementById('btn-filters').onclick = () => openModal('modal-filters');
+    document.getElementById('btn-edit-profile-open').onclick = () => {
+        populateProfileFormFields();
+        openModal('modal-profile-form');
+    };
+    document.getElementById('btn-close-match-modal').onclick = () => closeModal('modal-match-success');
 
-    modal.classList.remove("hidden");
+    // Filter Sliders Display
+    const minAge = document.getElementById('filter-min-age');
+    const maxAge = document.getElementById('filter-max-age');
+    const rangeDisp = document.getElementById('age-range-display');
 
-    document.getElementById("profile-form").onsubmit = async (e) => {
+    const updateAgeDisplay = () => {
+        rangeDisp.textContent = `${minAge.value} تا ${maxAge.value} سال`;
+    };
+    minAge.oninput = updateAgeDisplay;
+    maxAge.oninput = updateAgeDisplay;
+
+    document.getElementById('btn-apply-filters').onclick = () => {
+        state.filters.gender = document.querySelector('input[name="filter-gender"]:checked').value;
+        state.filters.city = document.getElementById('filter-city').value;
+        state.filters.min_age = parseInt(minAge.value);
+        state.filters.max_age = parseInt(maxAge.value);
+        closeModal('modal-filters');
+        loadCandidates();
+    };
+}
+
+function openModal(id) {
+    document.getElementById(id).classList.remove('hidden');
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.add('hidden');
+}
+
+// --- Profile Form Submit ---
+function setupProfileForm() {
+    document.getElementById('form-profile').onsubmit = async (e) => {
         e.preventDefault();
         const payload = {
-            name: document.getElementById("reg-name").value,
-            age: parseInt(document.getElementById("reg-age").value),
-            gender: document.getElementById("reg-gender").value,
-            city: document.getElementById("reg-city").value,
-            job: document.getElementById("reg-job").value,
-            education: eduSelect.value,
-            goal: goalSelect.value,
-            bio: document.getElementById("reg-bio").value,
-            interests: selectedInterests
+            name: document.getElementById('input-name').value,
+            age: parseInt(document.getElementById('input-age').value),
+            gender: document.getElementById('input-gender').value,
+            city: document.getElementById('input-city').value,
+            goal: document.getElementById('input-goal').value,
+            education: document.getElementById('input-education').value,
+            job: document.getElementById('input-job').value,
+            bio: document.getElementById('input-bio').value,
+            interests: state.selectedInterests
         };
 
-        try {
-            await fetchAPI("profile", "POST", payload);
-            Object.assign(currentUser, payload);
-            currentUser.is_complete = 1;
-            modal.classList.add("hidden");
-            renderMyProfile();
-            await loadCandidates();
-        } catch (err) {
-            alert(err.message);
+        const res = await apiCall('/api/profile', 'POST', payload);
+        if (res.success) {
+            state.user = { ...state.user, ...payload, is_complete: 1 };
+            updateMyProfileUI();
+            closeModal('modal-profile-form');
+            document.getElementById('btn-close-profile-modal').classList.remove('hidden');
+            showToast('پروفایل با موفقیت ثبت شد ✨');
+            loadCandidates();
+        } else {
+            showToast(res.error || 'خطا در ثبت پروفایل');
+        }
+    };
+
+    // Photo Upload
+    document.getElementById('input-photo-upload').onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('photo', file);
+
+        showToast('در حال بهینه‌سازی و آپلود عکس...');
+        const res = await apiCall('/api/photo', 'POST', formData, true);
+        if (res.success) {
+            state.user.photo_url = res.photo_url;
+            updateMyProfileUI();
+            showToast('عکس با موفقیت تغییر کرد ✅');
+        } else {
+            showToast(res.error || 'خطا در آپلود عکس');
         }
     };
 }
 
-// فیلترها
-function setupFilters() {
-    const modal = document.getElementById("filter-modal");
-    document.getElementById("btn-open-filter").onclick = () => {
-        document.getElementById("filter-city").innerHTML = `<option value="همه">همه شهرها</option>` +
-            currentOptions.cities.map(c => `<option value="${c}">${c}</option>`).join("");
-        modal.classList.remove("hidden");
-    };
+function populateProfileFormFields() {
+    if (!state.user) return;
+    document.getElementById('input-name').value = state.user.name || '';
+    document.getElementById('input-age').value = state.user.age || '';
+    document.getElementById('input-gender').value = state.user.gender || '';
+    document.getElementById('input-city').value = state.user.city || '';
+    document.getElementById('input-goal').value = state.user.goal || '';
+    document.getElementById('input-education').value = state.user.education || '';
+    document.getElementById('input-job').value = state.user.job || '';
+    document.getElementById('input-bio').value = state.user.bio || '';
 
-    document.getElementById("btn-close-filter").onclick = () => modal.classList.add("hidden");
+    state.selectedInterests = state.user.interests ? state.user.interests.split(',') : [];
+    document.querySelectorAll('.chip-item').forEach(chip => {
+        chip.classList.toggle('selected', state.selectedInterests.includes(chip.textContent));
+    });
+}
 
-    document.getElementById("btn-apply-filter").onclick = async () => {
-        currentFilters.gender = document.getElementById("filter-gender").value;
-        currentFilters.city = document.getElementById("filter-city").value;
-        currentFilters.min_age = parseInt(document.getElementById("filter-min-age").value);
-        currentFilters.max_age = parseInt(document.getElementById("filter-max-age").value);
+// --- Matches List Loader ---
+async function loadMatches() {
+    const listEl = document.getElementById('matches-list');
+    const emptyEl = document.getElementById('matches-empty');
+    listEl.innerHTML = '';
 
-        modal.classList.add("hidden");
-        await loadCandidates();
-    };
+    const res = await apiCall('/api/matches');
+    if (res.success && res.matches?.length > 0) {
+        emptyEl.classList.add('hidden');
+        document.getElementById('matches-count-badge').textContent = `${res.matches.length} مچ`;
+        document.getElementById('stat-matches-total').textContent = res.matches.length;
+
+        res.matches.forEach(m => {
+            const card = document.createElement('div');
+            card.className = 'match-card';
+            card.innerHTML = `
+                <img src="${m.photo_url || '/static/img/default-avatar.png'}" alt="${m.name}">
+                <div class="match-card-overlay">
+                    <h4>${m.name}</h4>
+                    <span>${m.city || ''}</span>
+                </div>
+            `;
+            card.onclick = () => {
+                if (m.username) {
+                    window.open(`https://t.me/${m.username}`, '_blank');
+                } else {
+                    showToast('کاربر آیدی تلگرام تنظیم نکرده است.');
+                }
+            };
+            listEl.appendChild(card);
+        });
+    } else {
+        emptyEl.classList.remove('hidden');
+        document.getElementById('matches-count-badge').textContent = '۰ مچ';
+    }
+}
+
+// --- Toast & Haptics ---
+function showToast(msg) {
+    const toast = document.getElementById('toast');
+    document.getElementById('toast-message').textContent = msg;
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 3200);
+}
+
+function haptic(type) {
+    try {
+        if (tg?.HapticFeedback) {
+            if (type === 'impactMedium') tg.HapticFeedback.impactOccurred('medium');
+            else if (type === 'impactLight') tg.HapticFeedback.impactOccurred('light');
+            else if (type === 'notificationSuccess') tg.HapticFeedback.notificationOccurred('success');
+            else if (type === 'selection') tg.HapticFeedback.selectionChanged();
+        }
+    } catch (e) {}
 }
