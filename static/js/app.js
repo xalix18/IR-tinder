@@ -83,32 +83,56 @@ function populateFormDropdowns() {
     const eduSelect = document.getElementById('input-education');
     const chipGrid = document.getElementById('interests-chip-grid');
 
-    // Cities
-    state.constants.CITIES?.forEach(city => {
+    if (!state.constants) {
+        console.error("Constants not loaded yet!");
+        return;
+    }
+
+    // پاکسازی آیتم‌های قبلی و اضافه کردن پیش‌فرض‌ها
+    citySelect.innerHTML = '<option value="" disabled selected>انتخاب شهر</option>';
+    filterCitySelect.innerHTML = '<option value="">همه شهرها</option>';
+    goalSelect.innerHTML = '<option value="">انتخاب هدف</option>';
+    eduSelect.innerHTML = '<option value="">انتخاب تحصیلات</option>';
+
+    // پشتیبانی همزمان از حروف بزرگ و کوچک فرستاده شده از بک‌اند
+    const citiesList = state.constants.cities || state.constants.CITIES || [];
+    const goalsList = state.constants.goals || state.constants.GOALS || [];
+    const educationList = state.constants.education || state.constants.education_levels || state.constants.EDUCATION || [];
+    const interestsList = state.constants.interests || state.constants.INTERESTS || [];
+
+    // پر کردن لیست شهرها
+    citiesList.forEach(city => {
         citySelect.innerHTML += `<option value="${city}">${city}</option>`;
         filterCitySelect.innerHTML += `<option value="${city}">${city}</option>`;
     });
 
-    // Goals
-    state.constants.GOALS?.forEach(goal => {
+    // پر کردن لیست اهداف
+    goalsList.forEach(goal => {
         goalSelect.innerHTML += `<option value="${goal}">${goal}</option>`;
     });
 
-    // Education
-    state.constants.EDUCATION?.forEach(edu => {
+    // پر کردن لیست تحصیلات
+    educationList.forEach(edu => {
         eduSelect.innerHTML += `<option value="${edu}">${edu}</option>`;
     });
 
-    // Interests
+    // پر کردن چیپ‌های علایق
     chipGrid.innerHTML = '';
-    state.constants.INTERESTS?.forEach(interest => {
+    interestsList.forEach(interest => {
         const chip = document.createElement('div');
         chip.className = 'chip-item';
         chip.textContent = interest;
+        
+        // اگر کاربر قبلاً این علاقه را انتخاب کرده، هایلایت شود
+        if (state.selectedInterests.includes(interest)) {
+            chip.classList.add('selected');
+        }
+        
         chip.onclick = () => toggleInterestChip(chip, interest);
         chipGrid.appendChild(chip);
     });
 }
+
 
 function toggleInterestChip(el, interest) {
     if (state.selectedInterests.includes(interest)) {
@@ -440,6 +464,7 @@ function setupProfileForm() {
 
 function populateProfileFormFields() {
     if (!state.user) return;
+    
     document.getElementById('input-name').value = state.user.name || '';
     document.getElementById('input-age').value = state.user.age || '';
     document.getElementById('input-gender').value = state.user.gender || '';
@@ -449,11 +474,23 @@ function populateProfileFormFields() {
     document.getElementById('input-job').value = state.user.job || '';
     document.getElementById('input-bio').value = state.user.bio || '';
 
-    state.selectedInterests = state.user.interests ? state.user.interests.split(',') : [];
+    // پردازش امن علایق کاربر به صورت آرایه یا رشته متنی کاما دار
+    if (state.user.interests) {
+        if (Array.isArray(state.user.interests)) {
+            state.selectedInterests = [...state.user.interests];
+        } else if (typeof state.user.interests === 'string') {
+            state.selectedInterests = state.user.interests.split(',').map(i => i.trim()).filter(Boolean);
+        }
+    } else {
+        state.selectedInterests = [];
+    }
+
+    // ست کردن وضعیت چیپ‌های علایق فعال
     document.querySelectorAll('.chip-item').forEach(chip => {
         chip.classList.toggle('selected', state.selectedInterests.includes(chip.textContent));
     });
 }
+
 
 // --- Matches List Loader ---
 async function loadMatches() {
