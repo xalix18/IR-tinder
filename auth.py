@@ -1,54 +1,51 @@
-import hmac
 import hashlib
+import hmac
 import json
-import urllib.parse
-from typing import Optional, Dict, Any
+from urllib.parse import parse_qs, unquote
+
 import config
 
 
-def validate_telegram_data(init_data: str) -> Optional[Dict[str, Any]]:
-    """
-    بررسی و اعتبارسنجی رشته initData ارسالی از Telegram Mini App
-    بر اساس الگوریتم رسمی HMAC-SHA256 تلگرام
-    """
+def validate_telegram_data(init_data: str) -> dict | None:
     if not init_data:
         return None
 
     try:
-        parsed_data = dict(urllib.parse.parse_qsl(init_data, keep_blank_values=True))
-        if "hash" not in parsed_data:
+        parsed = parse_qs(init_data, keep_blank_values=True)
+        received_hash = parsed.get("hash", [None])[0]
+        if not received_hash:
             return None
 
-        received_hash = parsed_data.pop("hash")
+        data_pairs = []
+        for key, values in parsed.items():
+            if key == "hash":
+                continue
+            data_pairs.append(f"{key}={unquote(values[0])}")
 
-        # مرتب‌سازی کلیدها به ترتیب حروف الفبا
-        data_check_string = "\n".join(
-            f"{k}={v}" for k, v in sorted(parsed_data.items())
-        )
+        data_pairs.sort()
+        data_check_string = "\n".join(data_pairs)
 
-        # ساخت کلید مخفی با توکن ربات
         secret_key = hmac.new(
-            key=b"WebAppData",
-            msg=config.BOT_TOKEN.encode("utf-8"),
-            digestmod=hashlib.sha256
+            b"WebAppData", config.BOT_TOKEN.encode(), hashlib.sha256
         ).digest()
 
-        # محاسبه هش
-        calculated_hash = hmac.new(
-            key=secret_key,
-            msg=data_check_string.encode("utf-8"),
-            digestmod=hashlib.sha256
+        computed_hash = hmac.new(
+            secret_key, data_check_string.encode(), hashlib.sha256
         ).hexdigest()
 
-        # مقایسه هش‌ها
-        if calculated_hash != received_hash:
+        if not hmac.compare_digest(computed_hash, received_hash):
             return None
 
-        # استخراج آبجکت کاربر
-        if "user" in parsed_data:
-            user_info = json.loads(parsed_data["user"])
-            return user_info
+        user_data_str = parsed.get("user", [None])[0]
+        if not user_data_str:
+            return None
 
-        return None
+        user_data = json.loads(unquote(user_data_str))
+        return {
+            "user_id": user_data.get("id"),
+            "first_name": user_data.get("first_name", ""),
+            "last_name": user_data.get("last_name", ""),
+            "username": user_data.get("username", ""),
+        }
     except Exception:
         return None
