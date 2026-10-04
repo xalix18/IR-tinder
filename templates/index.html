@@ -2,228 +2,331 @@
 <html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>آشنایی و هم‌صحبتی</title>
-    <!-- تلگرام وب‌اپ اسکریپت رسمی -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>همدم | سوشال مینی‌اپ</title>
+    
+    <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- فونت و آیکون‌ها -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts: Vazirmatn -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Phosphor Icons for ultra-crisp UI icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <div id="app">
-        <!-- لودینگ اولیه -->
-        <div id="loading-screen" class="screen-center">
-            <div class="spinner"></div>
-            <p>در حال اتصال به تلگرام...</p>
-        </div>
-
-        <!-- مودال ثبت‌نام/تکمیل پروفایل -->
-        <div id="register-modal" class="modal hidden">
-            <div class="modal-content">
-                <h2>📝 تکمیل پروفایل شما</h2>
-                <p class="modal-sub">برای شروع باید اطلاعات خود را وارد کنید.</p>
-                
-                <form id="profile-form">
-                    <div class="form-group">
-                        <label>نام و نام خانوادگی:</label>
-                        <input type="text" id="reg-name" required placeholder="مثال: علی رضایی">
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>سن:</label>
-                            <input type="number" id="reg-age" min="16" max="60" required placeholder="مثال: ۲۴">
-                        </div>
-                        <div class="form-group">
-                            <label>جنسیت:</label>
-                            <select id="reg-gender" required>
-                                <option value="male">👨 پسر</option>
-                                <option value="female">👩 دختر</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>شهر سکونت:</label>
-                        <select id="reg-city" required></select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>شغل یا رشته تحصیلی:</label>
-                        <input type="text" id="reg-job" placeholder="مثال: برنامه‌نویس، دانشجو...">
-                    </div>
-
-                    <div class="form-group">
-                        <label>مقطع تحصیلی:</label>
-                        <select id="reg-education"></select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>هدف از آشنایی:</label>
-                        <select id="reg-goal"></select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>بیوگرافی کوتاه:</label>
-                        <textarea id="reg-bio" rows="3" placeholder="چند جمله درباره خودتان بنویسید..."></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <label>علایق شما (حداقل ۱ مورد):</label>
-                        <div id="interests-chips" class="chips-container"></div>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary btn-block">
-                        <i class="fa-solid fa-check"></i> ذخیره و ورود به برنامه
-                    </button>
-                </form>
+    <div id="app-container">
+        
+        <!-- Header -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="ph-fill ph-flame"></i>
+                </div>
+                <span class="brand-name">همدم</span>
             </div>
-        </div>
-
-        <!-- سربرگ بالا -->
-        <header class="top-nav">
-            <div class="logo">
-                <i class="fa-solid fa-fire flame-icon"></i>
-                <span>هم‌صحبت</span>
+            <div class="header-actions">
+                <button id="btn-filters" class="icon-btn" title="فیلترها">
+                    <i class="ph-bold ph-faders"></i>
+                </button>
             </div>
-            <button id="btn-open-filter" class="icon-btn">
-                <i class="fa-solid fa-sliders"></i>
-            </button>
         </header>
 
-        <!-- بدنه اصلی تب‌ها -->
+        <!-- Main Content Area -->
         <main id="main-content">
-            <!-- تب ۱: کشف و سوایپ -->
-            <section id="tab-discover" class="tab-view active">
-                <div id="card-container" class="card-stack">
-                    <!-- کارت‌های افراد با جاوااسکریپت اینجا درج می‌شوند -->
-                </div>
-
-                <div id="empty-state" class="empty-view hidden">
-                    <i class="fa-solid fa-compass-drafting empty-icon"></i>
-                    <h3>کاربر جدیدی پیدا نشد!</h3>
-                    <p>تمام افراد واجد شرایط فعلی را دیده‌اید.</p>
-                    <div class="empty-actions">
-                        <button id="btn-restart" class="btn btn-secondary">
-                            <i class="fa-solid fa-rotate-right"></i> دیدن مجدد از ابتدا
+            
+            <!-- 1. DISCOVER TAB -->
+            <section id="tab-discover" class="tab-pane active">
+                <div id="card-deck-container">
+                    <div id="card-deck" class="card-deck">
+                        <!-- Cards injected via JS -->
+                    </div>
+                    
+                    <!-- Empty State / Radar -->
+                    <div id="empty-state" class="empty-state hidden">
+                        <div class="radar-scanner">
+                            <div class="radar-circle"></div>
+                            <div class="radar-circle delay-1"></div>
+                            <div class="radar-circle delay-2"></div>
+                            <i class="ph-duotone ph-magnifying-glass radar-icon"></i>
+                        </div>
+                        <h3>کسی در اطراف شما نیست!</h3>
+                        <p>می‌توانید فیلترهای سنی یا شهری را تغییر دهید، یا افراد دیده‌شده را دوباره بررسی کنید.</p>
+                        <button id="btn-reset-seen" class="btn-gradient">
+                            <i class="ph-bold ph-arrows-clockwise"></i>
+                            <span>شروع مجدد و دیدن همه</span>
                         </button>
                     </div>
                 </div>
 
-                <!-- دکمه‌های اقدام زیر کارت -->
-                <div class="action-buttons">
-                    <button id="btn-pass" class="act-btn act-pass" title="رد کردن">
-                        <i class="fa-solid fa-xmark"></i>
+                <!-- Floating Swipe Action Buttons -->
+                <div id="swipe-controls" class="swipe-controls">
+                    <button id="btn-pass" class="action-btn btn-pass" title="رد کردن">
+                        <i class="ph-bold ph-x"></i>
                     </button>
-                    <button id="btn-info" class="act-btn act-info" title="مشاهده مشخصات">
-                        <i class="fa-solid fa-info"></i>
+                    <button id="btn-info" class="action-btn btn-info" title="مشاهده جزئیات">
+                        <i class="ph-bold ph-info"></i>
                     </button>
-                    <button id="btn-like" class="act-btn act-like" title="لایک">
-                        <i class="fa-solid fa-heart"></i>
+                    <button id="btn-like" class="action-btn btn-like" title="پسندیدن">
+                        <i class="ph-fill ph-heart"></i>
                     </button>
                 </div>
             </section>
 
-            <!-- تب ۲: مچ‌ها -->
-            <section id="tab-matches" class="tab-view hidden">
-                <h3 class="section-title">💌 مچ‌های شما</h3>
+            <!-- 2. MATCHES TAB -->
+            <section id="tab-matches" class="tab-pane">
+                <div class="matches-header">
+                    <h2>گفتگوها و مچ‌ها</h2>
+                    <span id="matches-count-badge" class="badge">۰ مچ</span>
+                </div>
                 <div id="matches-list" class="matches-grid">
-                    <!-- لیست مچ‌ها با جاوااسکریپت پر می‌شود -->
+                    <!-- Matches injected via JS -->
+                </div>
+                <div id="matches-empty" class="empty-state-simple hidden">
+                    <div class="empty-icon-box">
+                        <i class="ph-duotone ph-chats-circle"></i>
+                    </div>
+                    <p>هنوز با کسی مچ نشده‌اید.<br>به کشف افراد ادامه دهید!</p>
                 </div>
             </section>
 
-            <!-- تب ۳: پروفایل من -->
-            <section id="tab-profile" class="tab-view hidden">
-                <div class="profile-card">
-                    <div class="avatar-wrapper">
-                        <img id="my-avatar" src="/static/images/default-avatar.png" alt="عکس من">
-                        <label for="photo-upload" class="avatar-edit-btn">
-                            <i class="fa-solid fa-camera"></i>
-                        </label>
-                        <input type="file" id="photo-upload" accept="image/*" class="hidden">
+            <!-- 3. PROFILE TAB -->
+            <section id="tab-profile" class="tab-pane">
+                <div class="my-profile-container">
+                    <div class="profile-preview-card">
+                        <div class="profile-photo-box">
+                            <img id="my-profile-img" src="/static/img/default-avatar.png" alt="پروفایل">
+                            <label for="input-photo-upload" class="photo-upload-overlay">
+                                <i class="ph-bold ph-camera"></i>
+                                <span>تغییر عکس</span>
+                            </label>
+                            <input type="file" id="input-photo-upload" accept="image/*" class="hidden">
+                        </div>
+                        <h2 id="my-profile-name-age">کاربر تلگرام، ۲۵</h2>
+                        <span id="my-profile-city" class="city-pill">
+                            <i class="ph-fill ph-map-pin"></i> تهران
+                        </span>
                     </div>
-                    <h2 id="my-name-age">کاربر تلگرام</h2>
-                    <p id="my-location" class="location-text"><i class="fa-solid fa-location-dot"></i> تهران</p>
 
-                    <div class="profile-details-box">
-                        <p id="my-bio" class="bio-text">بیوگرافی ثبت نشده است.</p>
-                        <div id="my-interests" class="chips-container small"></div>
+                    <div class="profile-stats-card">
+                        <div class="stat-item">
+                            <span class="stat-value" id="stat-likes-remaining">۵۰</span>
+                            <span class="stat-label">لایک روزانه</span>
+                        </div>
+                        <div class="stat-divider"></div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="stat-matches-total">۰</span>
+                            <span class="stat-label">مچ‌های فعال</span>
+                        </div>
                     </div>
 
-                    <button id="btn-edit-profile" class="btn btn-secondary btn-block">
-                        <i class="fa-solid fa-pen-to-square"></i> ویرایش اطلاعات
-                    </button>
+                    <div class="profile-actions-list">
+                        <button id="btn-edit-profile-open" class="list-menu-item">
+                            <div class="menu-item-left">
+                                <i class="ph-duotone ph-user-gear"></i>
+                                <span>ویرایش اطلاعات و بیوگرافی</span>
+                            </div>
+                            <i class="ph-bold ph-caret-left"></i>
+                        </button>
+                        
+                        <button id="btn-open-rules" class="list-menu-item">
+                            <div class="menu-item-left">
+                                <i class="ph-duotone ph-shield-check"></i>
+                                <span>قوانین و امنیت</span>
+                            </div>
+                            <i class="ph-bold ph-caret-left"></i>
+                        </button>
+                    </div>
                 </div>
             </section>
         </main>
 
-        <!-- پاپ‌آپ تبریک مچ شدن -->
-        <div id="match-popup" class="modal hidden">
-            <div class="modal-content match-modal">
-                <div class="match-animation">🎉</div>
-                <h2>شما مَچ شدید!</h2>
-                <p id="match-desc">شما و این کاربر همدیگر را لایک کرده‌اید.</p>
-                <div class="match-avatars">
-                    <img id="match-my-img" src="" alt="شما">
-                    <i class="fa-solid fa-heart match-heart"></i>
-                    <img id="match-target-img" src="" alt="طرف مقابل">
-                </div>
-                <a id="match-chat-btn" href="#" target="_blank" class="btn btn-primary btn-block">
-                    <i class="fa-brands fa-telegram"></i> شروع گفت‌وگو در تلگرام
-                </a>
-                <button id="match-close-btn" class="btn btn-secondary btn-block mt-2">ادامه سوایپ</button>
-            </div>
-        </div>
-
-        <!-- مودال فیلترها -->
-        <div id="filter-modal" class="modal hidden">
-            <div class="modal-content">
-                <h3>🎛 فیلترهای جست‌وجو</h3>
-                <div class="form-group mt-3">
-                    <label>نمایش افراد:</label>
-                    <select id="filter-gender">
-                        <option value="any">همه</option>
-                        <option value="male">فقط پسرها 👨</option>
-                        <option value="female">فقط دخترها 👩</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>شهر:</label>
-                    <select id="filter-city"></select>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>حداقل سن:</label>
-                        <input type="number" id="filter-min-age" value="16" min="16" max="60">
-                    </div>
-                    <div class="form-group">
-                        <label>حداکثر سن:</label>
-                        <input type="number" id="filter-max-age" value="60" min="16" max="60">
-                    </div>
-                </div>
-                <button id="btn-apply-filter" class="btn btn-primary btn-block mt-3">اعمال فیلتر</button>
-                <button id="btn-close-filter" class="btn btn-secondary btn-block mt-2">بستن</button>
-            </div>
-        </div>
-
-        <!-- نوار ناوبری پایین -->
+        <!-- Modern Bottom Navigation Bar -->
         <nav class="bottom-nav">
             <button class="nav-item active" data-tab="tab-discover">
-                <i class="fa-solid fa-layer-group"></i>
+                <i class="ph-bold ph-flame"></i>
                 <span>کشف</span>
             </button>
             <button class="nav-item" data-tab="tab-matches">
-                <i class="fa-solid fa-heart"></i>
+                <div class="nav-icon-wrapper">
+                    <i class="ph-bold ph-chat-teardrop-dots"></i>
+                    <span id="nav-match-dot" class="notification-dot hidden"></span>
+                </div>
                 <span>مچ‌ها</span>
             </button>
             <button class="nav-item" data-tab="tab-profile">
-                <i class="fa-solid fa-user"></i>
+                <i class="ph-bold ph-user"></i>
                 <span>پروفایل</span>
             </button>
         </nav>
+
+        <!-- MODAL: FILTERS -->
+        <div id="modal-filters" class="modal-overlay hidden">
+            <div class="modal-sheet">
+                <div class="modal-handle"></div>
+                <div class="modal-header">
+                    <h3>فیلترهای جستجو</h3>
+                    <button class="modal-close" data-close="modal-filters"><i class="ph-bold ph-x"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>تمایل به آشنایی با:</label>
+                        <div class="segmented-control">
+                            <label class="segment">
+                                <input type="radio" name="filter-gender" value="" checked>
+                                <span>همه</span>
+                            </label>
+                            <label class="segment">
+                                <input type="radio" name="filter-gender" value="female">
+                                <span>خانم‌ها</span>
+                            </label>
+                            <label class="segment">
+                                <input type="radio" name="filter-gender" value="male">
+                                <span>آقایان</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="filter-city">شهر:</label>
+                        <select id="filter-city" class="custom-select">
+                            <option value="">همه شهرها</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>محدوده سنی: <span id="age-range-display" class="highlight-text">۱۸ تا ۴۵ سال</span></label>
+                        <div class="range-slider-group">
+                            <input type="range" id="filter-min-age" min="16" max="60" value="18" class="range-input">
+                            <input type="range" id="filter-max-age" min="16" max="60" value="45" class="range-input">
+                        </div>
+                    </div>
+
+                    <button id="btn-apply-filters" class="btn-gradient w-100 mt-20">اعمال فیلترها</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: EDIT / ONBOARDING PROFILE -->
+        <div id="modal-profile-form" class="modal-overlay hidden">
+            <div class="modal-sheet modal-fullscreen-sheet">
+                <div class="modal-handle"></div>
+                <div class="modal-header">
+                    <h3 id="profile-modal-title">ویرایش پروفایل</h3>
+                    <button class="modal-close" id="btn-close-profile-modal" data-close="modal-profile-form"><i class="ph-bold ph-x"></i></button>
+                </div>
+                <div class="modal-body scrollable">
+                    <form id="form-profile">
+                        <div class="form-group">
+                            <label for="input-name">نام یا نام مستعار *</label>
+                            <input type="text" id="input-name" class="custom-input" placeholder="نام خود را وارد کنید" required maxlength="30">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group half">
+                                <label for="input-age">سن *</label>
+                                <input type="number" id="input-age" class="custom-input" placeholder="مثال: ۲۴" min="16" max="60" required>
+                            </div>
+                            <div class="form-group half">
+                                <label for="input-gender">جنسیت *</label>
+                                <select id="input-gender" class="custom-select" required>
+                                    <option value="" disabled selected>انتخاب کنید</option>
+                                    <option value="male">آقا</option>
+                                    <option value="female">خانم</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="input-city">شهر محل سکونت *</label>
+                            <select id="input-city" class="custom-select" required>
+                                <option value="" disabled selected>انتخاب شهر</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="input-goal">هدف از حضور در ربات</label>
+                            <select id="input-goal" class="custom-select">
+                                <option value="">انتخاب هدف</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="input-education">میزان تحصیلات</label>
+                            <select id="input-education" class="custom-select">
+                                <option value="">انتخاب تحصیلات</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="input-job">شغل یا حوزه فعالیت</label>
+                            <input type="text" id="input-job" class="custom-input" placeholder="مثال: طراح گرافیک، برنامه‌نویس..." maxlength="40">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="input-bio">درباره من (بیوگرافی)</label>
+                            <textarea id="input-bio" class="custom-textarea" rows="3" placeholder="چند جمله درباره روحیات، اخلاق یا علایق خود بنویسید..." maxlength="300"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>علایق و سرگرمی‌ها (حداکثر ۵ مورد)</label>
+                            <div id="interests-chip-grid" class="chip-grid">
+                                <!-- Chips dynamically injected -->
+                            </div>
+                        </div>
+
+                        <button type="submit" id="btn-save-profile" class="btn-gradient w-100 mt-20">ذخیره پروفایل</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: MATCH POPUP -->
+        <div id="modal-match-success" class="modal-overlay hidden">
+            <div class="match-popup-card">
+                <div class="sparkles-container">
+                    <i class="ph-fill ph-sparkle sp-1"></i>
+                    <i class="ph-fill ph-heart sp-2"></i>
+                    <i class="ph-fill ph-sparkle sp-3"></i>
+                </div>
+                
+                <h1 class="match-title">🎉 تبریک! مچ شدید!</h1>
+                <p class="match-subtitle">شما و <span id="match-partner-name" class="highlight">کاربر</span> هر دو یکدیگر را پسندیدید.</p>
+                
+                <div class="match-avatars-pair">
+                    <div class="match-avatar-frame me">
+                        <img id="match-my-avatar" src="/static/img/default-avatar.png" alt="من">
+                    </div>
+                    <div class="match-heart-center">
+                        <i class="ph-fill ph-heart"></i>
+                    </div>
+                    <div class="match-avatar-frame partner">
+                        <img id="match-partner-avatar" src="/static/img/default-avatar.png" alt="هم‌صحبت">
+                    </div>
+                </div>
+
+                <div class="match-popup-buttons">
+                    <a id="btn-match-telegram-link" href="#" target="_blank" class="btn-gradient w-100">
+                        <i class="ph-bold ph-paper-plane-tilt"></i>
+                        <span>ارسال پیام در تلگرام</span>
+                    </a>
+                    <button id="btn-close-match-modal" class="btn-glass w-100">ادامه کشف افراد</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div id="toast" class="toast hidden">
+            <span id="toast-message"></span>
+        </div>
+
     </div>
 
+    <!-- Scripts -->
     <script src="/static/js/app.js"></script>
 </body>
 </html>
